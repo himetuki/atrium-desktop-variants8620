@@ -78,6 +78,12 @@ public:
     static bool UndoLeftover();
     // The taskbars shown, nothing else changed (Atrium is not responding).
     static void ShowTaskbarsNow();
+    // Around one real mouse click on a tray icon the taskbars must be visible;
+    // the shell's own show-hook must not hide them again in between. Reveal
+    // shows them (no-op flags otherwise), Conceal hides them back only when
+    // Atrium had hidden them.
+    static void RevealForClick();
+    static void ConcealAfterClick();
 
 private:
     void HideTaskbars();
@@ -94,6 +100,7 @@ private:
     bool autoPlayBannerOurs_ = false; // Atrium turned the AutoPlay banners off; restore them
     bool autoPlayBannerReady_ = false; // AutoPlay banners are off (ours or already)
     bool exiting_ = false;
+    static std::atomic_bool suppressHide_; // a tray-icon click has the taskbars shown for a moment
     HWINEVENTHOOK hook_ = nullptr;
     DWORD hookedPid_ = 0;
 };

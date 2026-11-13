@@ -1,6 +1,7 @@
 #include "shell/tray_model.h"
 
 #include "log.h"
+#include "shell/system_chrome.h"
 
 #include <shellapi.h>
 #include <shlobj.h>
@@ -12,6 +13,7 @@
 #include <winrt/base.h>
 
 #include <algorithm>
+#include <iterator>
 #include <map>
 #include <set>
 
@@ -743,6 +745,88 @@ std::vector<int> MatchButtons(std::vector<Found>& buttons, std::vector<Record>& 
 
 } // namespace
 
+// A left click the shell refuses (the XAML tray's buttons often are, especially
+// while the system taskbar is hidden): bring the program's existing window to
+// the front. Never starts anything: launching an exe is not what clicking a
+// tray icon means, and a background program would silently run twice.
+bool ActivateWindowOf(const std::wstring& exe)
+{
+    if (exe.empty())
+        return false;
+    struct Match {
+        const std::wstring* exe;
+        HWND window = nullptr;
+    } m{&exe};
+    EnumWindows([](HWND w, LPARAM lp) -> BOOL {
+        Match& m = *reinterpret_cast<Match*>(lp);
+        if (!IsWindowVisible(w) || (GetWindowLongW(w, GWL_EXSTYLE) & WS_EX_TOOLWINDOW) || GetWindow(w, GW_OWNER))
+            return TRUE;
+        DWORD pid = 0;
+        GetWindowThreadProcessId(w, &pid);
+        if (!pid)
+            return TRUE;
+        HANDLE p = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+        if (!p)
+            return TRUE;
+        wchar_t path[MAX_PATH * 2]{};
+        DWORD size = DWORD(std::size(path));
+        BOOL ok = QueryFullProcessImageNameW(p, 0, path, &size);
+        CloseHandle(p);
+        if (!ok || _wcsicmp(path, m.exe->c_str()) != 0)
+            return TRUE;
+        m.window = w;
+        return FALSE;
+    }, reinterpret_cast<LPARAM>(&m));
+    if (!m.window)
+        return false;
+    AllowSetForegroundWindow(ASFW_ANY);
+    if (IsIconic(m.window))
+        ShowWindow(m.window, SW_RESTORE);
+    SetForegroundWindow(m.window);
+    return true;
+}
+
+// A right click on a XAML tray button opens the program's own menu only when a
+// real mouse click lands on it: UI Automation's ShowContextMenu almost never
+// reaches the icon's handler. The taskbars are shown for the moment of the
+// click, then hidden again; their position is what the bounds already say.
+// The input goes out only when the pointer really is over the shell's taskbar:
+// with the bar mid-slide-in, or anything of ours under the point, nothing is sent.
+bool RealTrayClick(const RECT& at)
+{
+    HWND tray = FindWindowW(L"Shell_TrayWnd", nullptr);
+    if (!tray || IsRectEmpty(&at))
+        return false;
+    const POINT p{(at.left + at.right) / 2, (at.top + at.bottom) / 2};
+    RECT on{};
+    GetWindowRect(tray, &on);
+    if (!PtInRect(&on, p))
+        return false;
+    POINT was{};
+    if (!GetCursorPos(&was))
+        return false;
+    SystemChrome::RevealForClick();
+    bool clicked = false;
+    if (IsWindowVisible(tray) && SetCursorPos(p.x, p.y)) {
+        Sleep(60); // the shell notices the pointer on its bar
+        HWND under = WindowFromPoint(p);
+        if (!under || (GetAncestor(under, GA_ROOT) != tray && !IsChild(tray, under))) {
+            SetCursorPos(was.x, was.y); // off the bar: send nothing, anywhere
+        } else {
+            INPUT in[2]{};
+            in[0].type = INPUT_MOUSE;
+            in[0].mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
+            in[1].type = INPUT_MOUSE;
+            in[1].mi.dwFlags = MOUSEEVENTF_RIGHTUP;
+            clicked = SendInput(2, in, sizeof(INPUT)) == 2;
+            SetCursorPos(was.x, was.y); // the pointer goes home at once
+            Sleep(180); // the menu opens before the bars hide again
+        }
+    }
+    SystemChrome::ConcealAfterClick();
+    return clicked;
+}
+
 std::wstring TrayModel::Title(const std::wstring& tip)
 {
     size_t a = tip.find_first_not_of(L" \t\r\n");
@@ -932,8 +1016,13 @@ void TrayModel::Worker()
                     }
                 } else if (it != buttons.end() && it->element) {
                     if (job.right) {
-                        winrt::com_ptr<IUIAutomationElement3> e3 = it->element.try_as<IUIAutomationElement3>();
-                        hr = e3 ? e3->ShowContextMenu() : E_NOINTERFACE;
+                        // The program's own menu: only a real click gives it.
+                        if (RealTrayClick(it->bounds))
+                            hr = S_OK;
+                        else {
+                            winrt::com_ptr<IUIAutomationElement3> e3 = it->element.try_as<IUIAutomationElement3>();
+                            hr = e3 ? e3->ShowContextMenu() : E_NOINTERFACE;
+                        }
                     } else {
                         // Invoke is the icon's left click. A double click is the second one: the
                         // shell turns two clicks within the double-click time into the app's
@@ -948,6 +1037,8 @@ void TrayModel::Worker()
                 Log(L"tray: %s on '%s' (%s) -> 0x%08X", click, Title(job.icon.tip).c_str(),
                     job.icon.exe.empty() ? L"-" : PathFindFileNameW(job.icon.exe.c_str()), unsigned(hr));
                 PostMessageW(notify_, msg_, 1, 0);
+                if (FAILED(hr) && !job.right && ActivateWindowOf(job.icon.exe))
+                    Log(L"tray: the click was refused (0x%08X); brought the window up instead", unsigned(hr));
                 continue;
             }
 

@@ -10,6 +10,7 @@
 
 #include <thread>
 #include <vector>
+#include <mutex>
 
 namespace atrium {
 
@@ -209,6 +210,30 @@ bool SystemChrome::UndoLeftover()
 
 void SystemChrome::ShowTaskbarsNow() { ShowTaskbars(); }
 
+// A real mouse click on a tray icon (its menu, its toggle) needs the taskbar
+// visible for the moment of the click. The shell's show-hook must stand still
+// in between; the bars go back only when Atrium had hidden them. The tray's
+// worker thread calls these while the main thread may be in the hook or in
+// OnShow, so every access to the shared state goes through one mutex.
+std::atomic_bool SystemChrome::suppressHide_ = false;
+static std::mutex clickMutex_;
+
+void SystemChrome::RevealForClick()
+{
+    std::lock_guard<std::mutex> guard(clickMutex_);
+    suppressHide_ = true;
+    ShowTaskbars();
+}
+
+void SystemChrome::ConcealAfterClick()
+{
+    std::lock_guard<std::mutex> guard(clickMutex_);
+    if (g_chrome && g_chrome->taskbarHidden_)
+        for (HWND w : Taskbars())
+            ShowWindow(w, SW_HIDE);
+    suppressHide_ = false;
+}
+
 SystemChrome::~SystemChrome()
 {
     RestoreForExit();
@@ -407,7 +432,7 @@ void SystemChrome::Watch()
 
 void CALLBACK SystemChrome::OnShow(HWINEVENTHOOK, DWORD, HWND w, LONG obj, LONG, DWORD, DWORD)
 {
-    if (obj == OBJID_WINDOW && g_chrome && g_chrome->taskbarHidden_ && w && IsTaskbar(w)) {
+    if (obj == OBJID_WINDOW && g_chrome && g_chrome->taskbarHidden_ && !suppressHide_ && w && IsTaskbar(w)) {
         ShowWindow(w, SW_HIDE);
         Log(L"chrome: Explorer showed its taskbar; hidden again");
     }
