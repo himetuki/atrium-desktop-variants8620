@@ -19,31 +19,31 @@ public sealed partial class MainWindow
     private sealed record WidgetChoice(string Kind, string Size, string Name, string Note, string Category);
 
     // The gallery's groups, in order; a segmented control above shows all of them or one.
-    private static readonly string[] WidgetCategoryNames = { "时钟", "天气", "日历", "效率", "照片", "系统" };
+    private static readonly string[] WidgetCategoryNames = { "Clock", "Weather", "Calendar", "Productivity", "Photos", "System" };
 
     private static WidgetChoice[] WidgetChoices => new WidgetChoice[]
     {
-        new("clock", "small", Loc.T("时钟"), Loc.T("本地时间的表盘"), "时钟"),
-        new("clock", "medium", Loc.T("世界时钟"), Loc.T("四座城市的表盘"), "时钟"),
-        new("digital", "small", Loc.T("数字时钟"), Loc.T("时间、星期与日期"), "时钟"),
-        new("digital", "medium", Loc.T("数字时钟"), Loc.T("再加三座城市"), "时钟"),
-        new("weather", "small", Loc.T("天气"), Loc.T("气温与天气"), "天气"),
-        new("weather", "medium", Loc.T("天气"), Loc.T("再加逐小时预报"), "天气"),
-        new("weather", "large", Loc.T("天气"), Loc.T("再加五天预报"), "天气"),
-        new("calendar", "small", Loc.T("日历"), Loc.T("今天与农历"), "日历"),
-        new("calendar", "medium", Loc.T("日历"), Loc.T("再加一个月历"), "日历"),
-        new("calendar", "large", Loc.T("农历月历"), Loc.T("每天下面写农历或节日"), "日历"),
-        new("notes", "small", Loc.T("备忘录"), Loc.T("点按即可输入"), "效率"),
-        new("reminders", "medium", Loc.T("提醒事项"), Loc.T("勾选完成的事"), "效率"),
-        new("photos", "small", Loc.T("照片"), Loc.T("「图片」文件夹里的一张"), "照片"),
-        new("photos", "medium", Loc.T("照片"), Loc.T("每 10 分钟换一张"), "照片"),
-        new("battery", "small", Loc.T("电池"), Loc.T("电量圆环"), "系统"),
-        new("system", "small", Loc.T("系统监视"), Loc.T("CPU、内存与磁盘"), "系统"),
-        new("system", "medium", Loc.T("系统监视"), Loc.T("三个圆环"), "系统"),
-        new("bluetooth", "small", Loc.T("蓝牙设备"), Loc.T("四个设备的电量"), "系统"),
-        new("bluetooth", "medium", Loc.T("蓝牙设备"), Loc.T("名称与电量"), "系统"),
-        new("network", "small", Loc.T("网络"), Loc.T("上下行速率与一分钟走势"), "系统"),
-        new("network", "medium", Loc.T("网络"), Loc.T("速率、走势与本次流量"), "系统"),
+        new("clock", "small", Loc.T("Clock"), Loc.T("Local time face"), "Clock"),
+        new("clock", "medium", Loc.T("World clock"), Loc.T("Four city faces"), "Clock"),
+        new("digital", "small", Loc.T("Digital clock"), Loc.T("Time, weekday and date"), "Clock"),
+        new("digital", "medium", Loc.T("Digital clock"), Loc.T("Three more cities"), "Clock"),
+        new("weather", "small", Loc.T("Weather"), Loc.T("Temperature and conditions"), "Weather"),
+        new("weather", "medium", Loc.T("Weather"), Loc.T("Hourly forecast added"), "Weather"),
+        new("weather", "large", Loc.T("Weather"), Loc.T("Five-day forecast added"), "Weather"),
+        new("calendar", "small", Loc.T("Calendar"), Loc.T("Today and lunar date"), "Calendar"),
+        new("calendar", "medium", Loc.T("Calendar"), Loc.T("Month calendar added"), "Calendar"),
+        new("calendar", "large", Loc.T("Lunar month calendar"), Loc.T("Lunar date or festival under each day"), "Calendar"),
+        new("notes", "small", Loc.T("Notes"), Loc.T("Click to type"), "Productivity"),
+        new("reminders", "medium", Loc.T("Reminders"), Loc.T("Check off completed items"), "Productivity"),
+        new("photos", "small", Loc.T("Photos"), Loc.T("One from your Pictures folder"), "Photos"),
+        new("photos", "medium", Loc.T("Photos"), Loc.T("Changes every 10 minutes"), "Photos"),
+        new("battery", "small", Loc.T("Battery"), Loc.T("Battery ring"), "System"),
+        new("system", "small", Loc.T("System monitor"), Loc.T("CPU, memory and disk"), "System"),
+        new("system", "medium", Loc.T("System monitor"), Loc.T("Three rings"), "System"),
+        new("bluetooth", "small", Loc.T("Bluetooth devices"), Loc.T("Four device batteries"), "System"),
+        new("bluetooth", "medium", Loc.T("Bluetooth devices"), Loc.T("Name and battery"), "System"),
+        new("network", "small", Loc.T("Network"), Loc.T("Down and up rates, with the last minute"), "System"),
+        new("network", "medium", Loc.T("Network"), Loc.T("Rates, the last minute and this session's traffic"), "System"),
     };
 
     private readonly Dictionary<string, FrameworkElement> _widgetSections = new();
@@ -68,7 +68,7 @@ public sealed partial class MainWindow
     {
         if (sender is not RadioButton { Tag: string category }) return;
         foreach (var (name, section) in _widgetSections)
-            section.Visibility = category == "全部" || category == name ? Visibility.Visible : Visibility.Collapsed;
+            section.Visibility = category == "All" || category == name ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // The gallery only adds while the widgets are on.
@@ -77,7 +77,7 @@ public sealed partial class MainWindow
         WidgetGallery.Opacity = WidgetsSwitch.IsOn ? 1 : 0.45;
         WidgetGallery.IsHitTestVisible = WidgetsSwitch.IsOn;
         // Only why the gallery does not answer: the widgets are off.
-        WidgetHint.Text = Loc.T("先打开“桌面小组件”。");
+        WidgetHint.Text = Loc.T("Turn on Desktop widgets first.");
         WidgetHint.Visibility = WidgetsSwitch.IsOn ? Visibility.Collapsed : Visibility.Visible;
     }
 
@@ -106,7 +106,7 @@ public sealed partial class MainWindow
         stage.SizeChanged += (_, _) => RenderGalleryCard(preview);
         var name = new TextBlock
         {
-            Text = c.Name + " · " + Loc.T(c.Size switch { "small" => "小", "medium" => "中", _ => "大" }),
+            Text = c.Name + " · " + Loc.T(c.Size switch { "small" => "Small", "medium" => "Medium", _ => "Large" }),
             Style = (Style)Application.Current.Resources["RowTitleStyle"], Margin = new Thickness(4, 0, 4, 2),
             TextTrimming = TextTrimming.CharacterEllipsis,
         };
@@ -121,13 +121,13 @@ public sealed partial class MainWindow
         button.TranslationTransition = new Vector3Transition { Duration = TimeSpan.FromMilliseconds(180) };
         button.PointerEntered += (_, _) => button.Translation = new Vector3(0, -2, 0);
         button.PointerExited += (_, _) => button.Translation = Vector3.Zero;
-        AutomationProperties.SetName(button, c.Size == "small" ? Loc.F("添加 {0}（小）", c.Name)
-            : c.Size == "medium" ? Loc.F("添加 {0}（中）", c.Name) : Loc.F("添加 {0}（大）", c.Name));
+        AutomationProperties.SetName(button, c.Size == "small" ? Loc.F("Add {0} (small)", c.Name)
+            : c.Size == "medium" ? Loc.F("Add {0} (medium)", c.Name) : Loc.F("Add {0} (large)", c.Name));
         ToolTipService.SetToolTip(button, c.Note);
         button.Click += async (_, _) =>
         {
             var error = await _client.AddWidgetAsync(c.Kind, c.Size);
-            WidgetHint.Text = error == null ? Loc.F("已把“{0}”放到桌面上。", c.Name) : error.Contains("room") ? Loc.T("桌面上没有空位了：先移除或缩小一个小组件。") : Loc.F("没有添加：{0}", error);
+            WidgetHint.Text = error == null ? Loc.F("Added “{0}” to the desktop.", c.Name) : error.Contains("room") ? Loc.T("No room on the desktop: remove or shrink a widget first.") : Loc.F("Not added: {0}", error);
             WidgetHint.Visibility = Visibility.Visible;
         };
         return button;

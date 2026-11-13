@@ -495,16 +495,16 @@ void ControlCenter::PaintMain(Canvas& c, const Theme& t)
         c.Text(title, D2D1::RectF(disc.right + 10, cy - 18, conn.right - 10, cy), 13.5f, t.text, DWRITE_FONT_WEIGHT_SEMI_BOLD);
         c.Text(sub, D2D1::RectF(disc.right + 10, cy, conn.right - 10, cy + 18), 11.5f, t.subtext);
     };
-    std::wstring wifiSub = radiosRead_ && !radios_.wifiPresent ? (status_.connected ? Tr(L"有线网络") : Tr(L"没有无线网卡"))
-                           : radiosRead_ && !radios_.wifiOn ? Tr(L"已关闭")
-                           : status_.connected && status_.wifi ? (private_ ? std::wstring(Tr(L"已连接")) : status_.network)
-                           : status_.connected ? Tr(L"有线网络") : Tr(L"未连接");
+    std::wstring wifiSub = radiosRead_ && !radios_.wifiPresent ? (status_.connected ? Tr(L"Ethernet") : Tr(L"No Wi-Fi adapter"))
+                           : radiosRead_ && !radios_.wifiOn ? Tr(L"Off")
+                           : status_.connected && status_.wifi ? (private_ ? std::wstring(Tr(L"Connected")) : status_.network)
+                           : status_.connected ? Tr(L"Ethernet") : Tr(L"Not connected");
     bool wifiOn = radiosRead_ ? radios_.wifiOn : status_.wifi && status_.connected;
     row(0, L"wifi", L"\uE701", L"Wi-Fi", wifiSub, wifiOn, !radiosRead_ || radios_.wifiPresent);
     int connected = int(std::count_if(devices_.begin(), devices_.end(), [](const BluetoothDevice& d) { return d.connected; }));
-    std::wstring btSub = !radiosRead_ ? L"…" : !radios_.btPresent ? Tr(L"不可用") : !radios_.btOn ? Tr(L"已关闭")
-                         : connected ? TrFormat(L"%d 台设备已连接", connected) : Tr(L"已打开");
-    row(1, L"bt", L"\uE702", Tr(L"蓝牙"), btSub, radios_.btOn, radios_.btPresent);
+    std::wstring btSub = !radiosRead_ ? L"…" : !radios_.btPresent ? Tr(L"Unavailable") : !radios_.btOn ? Tr(L"Off")
+                         : connected ? TrFormat(L"%d devices connected", connected) : Tr(L"On");
+    row(1, L"bt", L"\uE702", Tr(L"Bluetooth"), btSub, radios_.btOn, radios_.btPresent);
 
     // Battery: a small ring, the level and the state.
     {
@@ -519,18 +519,18 @@ void ControlCenter::PaintMain(Canvas& c, const Theme& t)
             c.Arc(cx, cy, 15, -90, -90 + 360.f * float(pct) / 100.f, level, 4);
             if (status_.charging)
                 c.Glyph(L"\uE945", D2D1::RectF(cx - 12, cy - 12, cx + 12, cy + 12), 11, t.text);
-            std::wstring state = status_.charging ? (pct >= 100 ? Tr(L"已充满") : Tr(L"正在充电"))
+            std::wstring state = status_.charging ? (pct >= 100 ? Tr(L"Fully charged") : Tr(L"Charging"))
                                  : status_.batteryMinutes >= 0
-                                     ? (status_.batteryMinutes >= 60 ? TrFormat(L"剩余 %d 小时", status_.batteryMinutes / 60)
-                                                                     : TrFormat(L"剩余 %d 分钟", status_.batteryMinutes))
-                                     : std::wstring(Tr(L"使用电池"));
+                                     ? (status_.batteryMinutes >= 60 ? TrFormat(L"%d hours left", status_.batteryMinutes / 60)
+                                                                     : TrFormat(L"%d minutes left", status_.batteryMinutes))
+                                     : std::wstring(Tr(L"On battery"));
             c.Text(std::to_wstring(pct) + L"%", D2D1::RectF(cx + 24, cy - 18, batt.right - 8, cy + 1), 15, t.text, DWRITE_FONT_WEIGHT_SEMI_BOLD);
             c.Text(state, D2D1::RectF(cx + 24, cy + 1, batt.right - 8, cy + 18), 11.5f, t.subtext);
         } else {
             c.Circle(cx, cy, 16, Alpha(t.text, 0.16f));
             c.Glyph(L"\uE945", D2D1::RectF(cx - 14, cy - 14, cx + 14, cy + 14), 13, t.text);
-            c.Text(Tr(L"电源"), D2D1::RectF(cx + 24, cy - 18, batt.right - 8, cy + 1), 13.5f, t.text, DWRITE_FONT_WEIGHT_SEMI_BOLD);
-            c.Text(Tr(L"已接通电源"), D2D1::RectF(cx + 24, cy + 1, batt.right - 8, cy + 18), 11.5f, t.subtext);
+            c.Text(Tr(L"Power"), D2D1::RectF(cx + 24, cy - 18, batt.right - 8, cy + 1), 13.5f, t.text, DWRITE_FONT_WEIGHT_SEMI_BOLD);
+            c.Text(Tr(L"Plugged in"), D2D1::RectF(cx + 24, cy + 1, batt.right - 8, cy + 18), 11.5f, t.subtext);
         }
         hits_.push_back({batt, L"battery"});
     }
@@ -542,8 +542,8 @@ void ControlCenter::PaintMain(Canvas& c, const Theme& t)
         float cx = cast.left + 32, cy = (cast.top + cast.bottom) / 2;
         c.Circle(cx, cy, 16, Alpha(t.text, 0.16f));
         c.Glyph(L"\uE7F4", D2D1::RectF(cx - 14, cy - 14, cx + 14, cy + 14), 13, t.text);
-        c.Text(Tr(L"投屏"), D2D1::RectF(cx + 24, cy - 18, cast.right - 8, cy + 1), 13.5f, t.text, DWRITE_FONT_WEIGHT_SEMI_BOLD);
-        c.Text(projecting_.empty() ? Tr(L"无线显示器") : Tr(L"已连接"), D2D1::RectF(cx + 24, cy + 1, cast.right - 8, cy + 18), 11.5f,
+        c.Text(Tr(L"Cast"), D2D1::RectF(cx + 24, cy - 18, cast.right - 8, cy + 1), 13.5f, t.text, DWRITE_FONT_WEIGHT_SEMI_BOLD);
+        c.Text(projecting_.empty() ? Tr(L"Wireless display") : Tr(L"Connected"), D2D1::RectF(cx + 24, cy + 1, cast.right - 8, cy + 18), 11.5f,
                projecting_.empty() ? t.subtext : t.accent);
         hits_.push_back({cast, L"cast"});
     }
@@ -558,17 +558,17 @@ void ControlCenter::PaintMain(Canvas& c, const Theme& t)
         c.halo = false;
         c.Glyph(L"\uE7C4", D2D1::RectF(cx - 14, cy - 14, cx + 14, cy + 14), 14, stageOn_ ? D2D1::ColorF(1, 1, 1, 0.98f) : t.text);
         c.halo = halo;
-        c.Text(Tr(L"台前调度"), D2D1::RectF(cx + 28, cy - 18, stage.right - kPad, cy), 13.5f, t.text, DWRITE_FONT_WEIGHT_SEMI_BOLD);
-        c.Text(stageOn_ ? (stageRight_ ? Tr(L"已打开 · 最近使用的应用在右侧") : Tr(L"已打开 · 最近使用的应用在左侧")) : Tr(L"已关闭"),
+        c.Text(Tr(L"Stage Manager"), D2D1::RectF(cx + 28, cy - 18, stage.right - kPad, cy), 13.5f, t.text, DWRITE_FONT_WEIGHT_SEMI_BOLD);
+        c.Text(stageOn_ ? (stageRight_ ? Tr(L"On · recent apps on the right") : Tr(L"On · recent apps on the left")) : Tr(L"Off"),
                D2D1::RectF(cx + 28, cy, stage.right - kPad, cy + 18), 11.5f, t.subtext);
         hits_.push_back({stage, L"stage"});
     }
-    PaintSlider(c, t, bright, L"bright", Tr(L"显示器"), L"\uE706", std::max(brightness_, 0), false,
-                CanSetBrightness() ? std::to_wstring(brightness_) + L"%" : brightness_ == -1 ? Tr(L"不支持调节") : std::wstring(), brightTrack_,
+    PaintSlider(c, t, bright, L"bright", Tr(L"Displays"), L"\uE706", std::max(brightness_, 0), false,
+                CanSetBrightness() ? std::to_wstring(brightness_) + L"%" : brightness_ == -1 ? Tr(L"Not adjustable") : std::wstring(), brightTrack_,
                 CanSetBrightness());
-    std::wstring level = !status_.audio ? Tr(L"没有播放设备") : status_.muted ? Tr(L"静音") : std::to_wstring(status_.volume) + L"%";
+    std::wstring level = !status_.audio ? Tr(L"No output device") : status_.muted ? Tr(L"Muted") : std::to_wstring(status_.volume) + L"%";
     const wchar_t* g = !status_.audio || status_.muted ? L"\uE74F" : status_.volume < 34 ? L"\uE993" : status_.volume < 67 ? L"\uE994" : L"\uE995";
-    PaintSlider(c, t, sound, L"slider", Tr(L"声音"), g, status_.audio ? status_.volume : 0, status_.muted, level, volumeTrack_);
+    PaintSlider(c, t, sound, L"slider", Tr(L"Sound"), g, status_.audio ? status_.volume : 0, status_.muted, level, volumeTrack_);
 }
 
 void ControlCenter::PaintSlider(Canvas& c, const Theme& t, D2D1_RECT_F card, const std::wstring& id, const std::wstring& title, const std::wstring& glyph,
@@ -652,9 +652,9 @@ void ControlCenter::PaintWifi(Canvas& c, const Theme& t, D2D1_RECT_F card)
     };
     const bool on = !radiosRead_ || radios_.wifiOn;
     if (!on)
-        message(Tr(L"Wi-Fi 已关闭"));
+        message(Tr(L"Wi-Fi is off"));
     else if (networks_.empty())
-        message(scanned_ ? Tr(L"没有找到 Wi-Fi 网络") : Tr(L"正在搜索网络…"));
+        message(scanned_ ? Tr(L"No Wi-Fi networks found") : Tr(L"Searching for networks…"));
     for (int i = 0; on && i < kMaxRows && i < int(networks_.size()); ++i) {
         const WifiNetwork& n = networks_[size_t(i)];
         D2D1_RECT_F row = D2D1::RectF(kPad - 4, y + 2, w - kPad + 4, y + kRowH - 2);
@@ -672,7 +672,7 @@ void ControlCenter::PaintWifi(Canvas& c, const Theme& t, D2D1_RECT_F card)
             c.Glyph(L"\uE72E", D2D1::RectF(row.right - 112, row.top, row.right - 92, row.bottom), 11, t.faint);
         if (n.connected) {
             if (hv > 0.05f) {
-                std::wstring label = Tr(L"断开");
+                std::wstring label = Tr(L"Disconnect");
                 float bw = c.TextWidth(label, 12) + 24;
                 D2D1_RECT_F b = D2D1::RectF(right - bw, cy - 14, right, cy + 14);
                 c.BeginGroup(hv, 1, (b.left + b.right) / 2, cy);
@@ -681,10 +681,10 @@ void ControlCenter::PaintWifi(Canvas& c, const Theme& t, D2D1_RECT_F card)
                 c.EndGroup();
                 hits_.push_back({b, L"disconnect"});
             } else {
-                c.Text(Tr(L"已连接"), D2D1::RectF(right - 80, row.top, right, row.bottom), 12, t.accent, DWRITE_FONT_WEIGHT_SEMI_BOLD, 2);
+                c.Text(Tr(L"Connected"), D2D1::RectF(right - 80, row.top, right, row.bottom), 12, t.accent, DWRITE_FONT_WEIGHT_SEMI_BOLD, 2);
             }
         } else if (hv > 0.05f) {
-            c.Text(n.profile.empty() && n.secured ? Tr(L"输入密码…") : Tr(L"连接"), D2D1::RectF(right - 90, row.top, right, row.bottom), 12,
+            c.Text(n.profile.empty() && n.secured ? Tr(L"Enter password…") : Tr(L"Connect"), D2D1::RectF(right - 90, row.top, right, row.bottom), 12,
                    Alpha(t.subtext, hv), DWRITE_FONT_WEIGHT_NORMAL, 2);
         }
         hits_.push_back({row, id});
@@ -699,25 +699,25 @@ void ControlCenter::PaintWifi(Canvas& c, const Theme& t, D2D1_RECT_F card)
         c.Text(label, D2D1::RectF(b.left + 12, b.top, b.right - 12, b.bottom), 12.5f, t.subtext, DWRITE_FONT_WEIGHT_NORMAL, align);
         hits_.push_back({b, id});
     };
-    link(L"netsettings", Tr(L"网络和 Internet 设置"), kPad - 4, w / 2 + 20, 0);
-    link(L"netlist", Tr(L"更多 Wi-Fi 网络"), w / 2 + 28, w - kPad + 4, 2);
+    link(L"netsettings", Tr(L"Network & Internet settings"), kPad - 4, w / 2 + 20, 0);
+    link(L"netlist", Tr(L"More Wi-Fi networks"), w / 2 + 28, w - kPad + 4, 2);
 }
 
 void ControlCenter::PaintBluetooth(Canvas& c, const Theme& t, D2D1_RECT_F card)
 {
     const float w = card.right - card.left;
-    PaintHeader(c, t, card, Tr(L"蓝牙"), radios_.btOn, L"bt");
+    PaintHeader(c, t, card, Tr(L"Bluetooth"), radios_.btOn, L"bt");
     float y = card.top + kHeader;
     auto message = [&](const wchar_t* text) {
         c.Text(text, D2D1::RectF(kPad, y, w - kPad, y + kRowH), 13, t.subtext, DWRITE_FONT_WEIGHT_NORMAL, 1);
         y += kRowH;
     };
     if (radiosRead_ && !radios_.btPresent)
-        message(Tr(L"这台电脑没有蓝牙"));
+        message(Tr(L"This PC has no Bluetooth"));
     else if (!radios_.btOn)
-        message(Tr(L"蓝牙已关闭"));
+        message(Tr(L"Bluetooth is off"));
     else if (devices_.empty())
-        message(devicesRead_ ? Tr(L"没有已配对的设备") : Tr(L"正在读取设备…"));
+        message(devicesRead_ ? Tr(L"No paired devices") : Tr(L"Reading devices…"));
     for (int i = 0; radios_.btOn && i < kMaxRows && i < int(devices_.size()); ++i) {
         const BluetoothDevice& d = devices_[size_t(i)];
         D2D1_RECT_F row = D2D1::RectF(kPad - 4, y + 2, w - kPad + 4, y + kRowH - 2);
@@ -732,10 +732,10 @@ void ControlCenter::PaintBluetooth(Canvas& c, const Theme& t, D2D1_RECT_F card)
         c.halo = false;
         c.Glyph(L"\uE702", disc, 12, d.connected ? D2D1::ColorF(1, 1, 1, 0.98f) : t.text);
         c.halo = halo;
-        std::wstring name = private_ ? TrFormat(L"蓝牙设备 %d", i + 1) : d.name;
+        std::wstring name = private_ ? TrFormat(L"Bluetooth device %d", i + 1) : d.name;
         c.Text(name, D2D1::RectF(disc.right + 10, row.top, row.right - 80, row.bottom), 13.5f, t.text,
                d.connected ? DWRITE_FONT_WEIGHT_SEMI_BOLD : DWRITE_FONT_WEIGHT_NORMAL);
-        c.Text(d.connected ? Tr(L"已连接") : Tr(L"未连接"), D2D1::RectF(row.right - 80, row.top, row.right - 12, row.bottom), 12,
+        c.Text(d.connected ? Tr(L"Connected") : Tr(L"Not connected"), D2D1::RectF(row.right - 80, row.top, row.right - 12, row.bottom), 12,
                d.connected ? t.accent : t.faint, d.connected ? DWRITE_FONT_WEIGHT_SEMI_BOLD : DWRITE_FONT_WEIGHT_NORMAL, 2);
         hits_.push_back({row, id});
         y += kRowH;
@@ -745,7 +745,7 @@ void ControlCenter::PaintBluetooth(Canvas& c, const Theme& t, D2D1_RECT_F card)
     float hv = Hover(c, L"btsettings", hover_ == L"btsettings");
     if (hv > 0.001f)
         c.Fill(b, (b.bottom - b.top) / 2, Alpha(t.hover, hv));
-    c.Text(Tr(L"蓝牙和其他设备设置"), D2D1::RectF(b.left + 12, b.top, b.right - 12, b.bottom), 12.5f, t.subtext);
+    c.Text(Tr(L"Bluetooth & devices settings"), D2D1::RectF(b.left + 12, b.top, b.right - 12, b.bottom), 12.5f, t.subtext);
     hits_.push_back({b, L"btsettings"});
 }
 
@@ -764,14 +764,14 @@ void ControlCenter::Link(Canvas& c, const Theme& t, const std::wstring& id, cons
 void ControlCenter::PaintSound(Canvas& c, const Theme& t, D2D1_RECT_F card)
 {
     const float w = card.right - card.left;
-    PaintHeader(c, t, card, Tr(L"声音输出"), false, L"");
+    PaintHeader(c, t, card, Tr(L"Sound output"), false, L"");
     float y = card.top + kHeader;
     auto message = [&](const wchar_t* text, float h) {
         c.Text(text, D2D1::RectF(kPad, y, w - kPad, y + h), 13, t.subtext, DWRITE_FONT_WEIGHT_NORMAL, 1);
         y += h;
     };
     if (outputs_.empty())
-        message(audioRead_ ? Tr(L"没有播放设备") : Tr(L"正在读取…"), kRowH);
+        message(audioRead_ ? Tr(L"No output device") : Tr(L"Reading…"), kRowH);
     for (int i = 0; i < kMaxOutputs && i < int(outputs_.size()); ++i) {
         const AudioOutput& o = outputs_[size_t(i)];
         D2D1_RECT_F row = D2D1::RectF(kPad - 4, y + 2, w - kPad + 4, y + kRowH - 2);
@@ -803,11 +803,11 @@ void ControlCenter::PaintSound(Canvas& c, const Theme& t, D2D1_RECT_F card)
 
     // The volume mixer.
     c.Line(kPad + 4, y + 2, w - kPad - 4, y + 2, t.divider);
-    c.Text(Tr(L"音量合成器"), D2D1::RectF(kPad, y + 8, w - kPad, y + kSection), 12, t.subtext, DWRITE_FONT_WEIGHT_SEMI_BOLD);
+    c.Text(Tr(L"Volume mixer"), D2D1::RectF(kPad, y + 8, w - kPad, y + kSection), 12, t.subtext, DWRITE_FONT_WEIGHT_SEMI_BOLD);
     y += kSection;
     appTracks_.assign(apps_.size(), D2D1_RECT_F{});
     if (apps_.empty())
-        message(audioRead_ ? Tr(L"没有应用在播放声音") : Tr(L"正在读取…"), kAppRowH);
+        message(audioRead_ ? Tr(L"No apps are playing sound") : Tr(L"Reading…"), kAppRowH);
     for (int i = 0; i < kMaxApps && i < int(apps_.size()); ++i) {
         const AudioApp& a = apps_[size_t(i)];
         const std::wstring sid = L"app:" + std::to_wstring(i), mid = L"amute:" + std::to_wstring(i);
@@ -830,7 +830,7 @@ void ControlCenter::PaintSound(Canvas& c, const Theme& t, D2D1_RECT_F card)
         const float left = icon.right + 12;
         c.Text(a.name, D2D1::RectF(left, cy - 21, w - kPad - 44, cy - 3), 12.5f, a.active ? t.text : t.subtext,
                a.active ? DWRITE_FONT_WEIGHT_SEMI_BOLD : DWRITE_FONT_WEIGHT_NORMAL);
-        c.Text(a.muted ? Tr(L"静音") : std::to_wstring(a.volume) + L"%", D2D1::RectF(w - kPad - 60, cy - 21, w - kPad, cy - 3), 11, t.subtext,
+        c.Text(a.muted ? Tr(L"Muted") : std::to_wstring(a.volume) + L"%", D2D1::RectF(w - kPad - 60, cy - 21, w - kPad, cy - 3), 11, t.subtext,
                DWRITE_FONT_WEIGHT_NORMAL, 2);
         // A thin line with a knob, as on the Windows taskbar's mixer.
         const float knob = 7, ty = cy + 9;
@@ -849,8 +849,8 @@ void ControlCenter::PaintSound(Canvas& c, const Theme& t, D2D1_RECT_F card)
         y += kAppRowH;
     }
     c.Line(kPad + 4, y + 2, w - kPad - 4, y + 2, t.divider);
-    Link(c, t, L"soundsettings", Tr(L"更多音量设置"), kPad - 4, w / 2 + 10, y, 0);
-    Link(c, t, L"mixer", Tr(L"音量合成器设置"), w / 2 + 18, w - kPad + 4, y, 2);
+    Link(c, t, L"soundsettings", Tr(L"More sound settings"), kPad - 4, w / 2 + 10, y, 0);
+    Link(c, t, L"mixer", Tr(L"Volume mixer settings"), w / 2 + 18, w - kPad + 4, y, 2);
 }
 
 namespace {
@@ -888,7 +888,7 @@ void ModePicture(Canvas& c, ProjectionMode m, float cx, float cy, D2D1_COLOR_F i
 void ControlCenter::PaintCast(Canvas& c, const Theme& t, D2D1_RECT_F card)
 {
     const float w = card.right - card.left;
-    float right = PaintHeader(c, t, card, Tr(L"投屏"), false, L"");
+    float right = PaintHeader(c, t, card, Tr(L"Cast"), false, L"");
     const bool searching = finder_.Searching();
     {
         D2D1_RECT_F rescan = D2D1::RectF(right - 30, card.top + kHeader / 2 - 15, right, card.top + kHeader / 2 + 15);
@@ -900,7 +900,7 @@ void ControlCenter::PaintCast(Canvas& c, const Theme& t, D2D1_RECT_F card)
     }
     float y = card.top + kHeader;
     if (displays_.empty()) {
-        c.Text(searching ? Tr(L"正在搜索无线显示器…") : Tr(L"没有找到无线显示器"), D2D1::RectF(kPad, y, w - kPad, y + kRowH), 13, t.subtext,
+        c.Text(searching ? Tr(L"Searching for wireless displays…") : Tr(L"No wireless displays found"), D2D1::RectF(kPad, y, w - kPad, y + kRowH), 13, t.subtext,
                DWRITE_FONT_WEIGHT_NORMAL, 1);
         y += kRowH;
     }
@@ -919,14 +919,14 @@ void ControlCenter::PaintCast(Canvas& c, const Theme& t, D2D1_RECT_F card)
         c.halo = false;
         c.Glyph(L"\uE7F4", disc, 12, on ? D2D1::ColorF(1, 1, 1, 0.98f) : t.text);
         c.halo = halo;
-        std::wstring name = private_ ? TrFormat(L"无线显示器 %d", i + 1) : d.name;
+        std::wstring name = private_ ? TrFormat(L"Wireless display %d", i + 1) : d.name;
         c.Text(name, D2D1::RectF(disc.right + 10, row.top, row.right - 96, row.bottom), 13.5f, t.text,
                on ? DWRITE_FONT_WEIGHT_SEMI_BOLD : DWRITE_FONT_WEIGHT_NORMAL);
         float r = row.right - 12;
         if (busy) {
-            c.Text(Tr(L"正在连接…"), D2D1::RectF(r - 90, row.top, r, row.bottom), 12, t.subtext, DWRITE_FONT_WEIGHT_NORMAL, 2);
+            c.Text(Tr(L"Connecting…"), D2D1::RectF(r - 90, row.top, r, row.bottom), 12, t.subtext, DWRITE_FONT_WEIGHT_NORMAL, 2);
         } else if (on && hv > 0.05f) {
-            std::wstring label = Tr(L"断开");
+            std::wstring label = Tr(L"Disconnect");
             float bw = c.TextWidth(label, 12) + 24;
             D2D1_RECT_F b = D2D1::RectF(r - bw, cy - 14, r, cy + 14);
             c.BeginGroup(hv, 1, (b.left + b.right) / 2, cy);
@@ -935,9 +935,9 @@ void ControlCenter::PaintCast(Canvas& c, const Theme& t, D2D1_RECT_F card)
             c.EndGroup();
             hits_.push_back({b, L"castoff"});
         } else if (on) {
-            c.Text(Tr(L"已连接"), D2D1::RectF(r - 80, row.top, r, row.bottom), 12, t.accent, DWRITE_FONT_WEIGHT_SEMI_BOLD, 2);
+            c.Text(Tr(L"Connected"), D2D1::RectF(r - 80, row.top, r, row.bottom), 12, t.accent, DWRITE_FONT_WEIGHT_SEMI_BOLD, 2);
         } else if (hv > 0.05f) {
-            c.Text(Tr(L"连接"), D2D1::RectF(r - 80, row.top, r, row.bottom), 12, Alpha(t.subtext, hv), DWRITE_FONT_WEIGHT_NORMAL, 2);
+            c.Text(Tr(L"Connect"), D2D1::RectF(r - 80, row.top, r, row.bottom), 12, Alpha(t.subtext, hv), DWRITE_FONT_WEIGHT_NORMAL, 2);
         }
         hits_.push_back({row, id});
         y += kRowH;
@@ -945,12 +945,12 @@ void ControlCenter::PaintCast(Canvas& c, const Theme& t, D2D1_RECT_F card)
 
     // Projection modes (Win+P); with a single screen only its own is there.
     c.Line(kPad + 4, y + 2, w - kPad - 4, y + 2, t.divider);
-    c.Text(Tr(L"投影模式"), D2D1::RectF(kPad, y + 8, w - kPad, y + kSection), 12, t.subtext, DWRITE_FONT_WEIGHT_SEMI_BOLD);
+    c.Text(Tr(L"Projection mode"), D2D1::RectF(kPad, y + 8, w - kPad, y + kSection), 12, t.subtext, DWRITE_FONT_WEIGHT_SEMI_BOLD);
     if (monitors_ < 2)
-        c.Text(Tr(L"只连接了一个显示器"), D2D1::RectF(kPad, y + 8, w - kPad, y + kSection), 11, t.faint, DWRITE_FONT_WEIGHT_NORMAL, 2);
+        c.Text(Tr(L"Only one display is connected"), D2D1::RectF(kPad, y + 8, w - kPad, y + kSection), 11, t.faint, DWRITE_FONT_WEIGHT_NORMAL, 2);
     y += kSection;
     const ProjectionMode modes[4] = {ProjectionMode::Internal, ProjectionMode::Clone, ProjectionMode::Extend, ProjectionMode::External};
-    const wchar_t* labels[4] = {Tr(L"仅电脑屏幕"), Tr(L"复制"), Tr(L"扩展"), Tr(L"仅第二屏幕")};
+    const wchar_t* labels[4] = {Tr(L"PC screen only"), Tr(L"Duplicate"), Tr(L"Extend"), Tr(L"Second screen only")};
     const float tg = 8, tw = (w - 2 * kPad - 3 * tg) / 4;
     for (int i = 0; i < 4; ++i) {
         D2D1_RECT_F tile = D2D1::RectF(kPad + float(i) * (tw + tg), y + 4, kPad + float(i) * (tw + tg) + tw, y + kModeH - 8);
@@ -970,8 +970,8 @@ void ControlCenter::PaintCast(Canvas& c, const Theme& t, D2D1_RECT_F card)
     }
     y += kModeH;
     c.Line(kPad + 4, y + 2, w - kPad - 4, y + 2, t.divider);
-    Link(c, t, L"castproject", Tr(L"投影到此电脑"), kPad - 4, w / 2 + 10, y, 0);
-    Link(c, t, L"castpanel", Tr(L"系统投屏面板"), w / 2 + 18, w - kPad + 4, y, 2);
+    Link(c, t, L"castproject", Tr(L"Project to this PC"), kPad - 4, w / 2 + 10, y, 0);
+    Link(c, t, L"castpanel", Tr(L"System cast panel"), w / 2 + 18, w - kPad + 4, y, 2);
 }
 
 std::wstring ControlCenter::HitAt(POINT pt) const

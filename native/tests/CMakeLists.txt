@@ -35,5 +35,14 @@ add_executable(usb_volume_tests
     ../core/log.cpp)
 target_include_directories(usb_volume_tests PRIVATE ../core)
 target_compile_definitions(usb_volume_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(usb_volume_tests PRIVATE windowsapp)
 add_test(NAME usb_volume COMMAND usb_volume_tests)
 set_tests_properties(usb_volume PROPERTIES TIMEOUT 20)
+
+add_executable(localization_tests
+    localization_checks.cpp
+    ../core/localization.cpp)
+target_include_directories(localization_tests PRIVATE ../core)
+target_compile_definitions(localization_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(localization_tests PRIVATE windowsapp)
+add_test(NAME localization COMMAND localization_tests)

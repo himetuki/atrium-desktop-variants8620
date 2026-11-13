@@ -250,7 +250,7 @@ std::vector<AudioApp> ListAudioApps(int iconPx)
                 AudioApp a;
                 a.key = key;
                 a.path = path;
-                a.name = key == L"#system" ? Tr(L"系统声音") : path.empty() ? Tr(L"应用") : ProgramName(path);
+                a.name = key == L"#system" ? Tr(L"System Sounds") : path.empty() ? Tr(L"Apps") : ProgramName(path);
                 a.volume = int(std::lround(level * 100));
                 a.muted = mute != FALSE;
                 a.active = state == AudioSessionStateActive;

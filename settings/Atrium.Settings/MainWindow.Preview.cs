@@ -25,7 +25,7 @@ public sealed partial class MainWindow
     {
         if (_page != 1) return;
         if (_readout.Count == 0)
-            foreach (var name in new[] { Loc.T("高度"), Loc.T("圆角"), Loc.T("宽度"), Loc.T("轮廓") })
+            foreach (var name in new[] { Loc.T("Height"), Loc.T("Corner radius"), Loc.T("Width"), Loc.T("Outline") })
             {
                 var value = new TextBlock { Style = StyleOf("TitleStyle") };
                 Microsoft.UI.Xaml.Documents.Typography.SetNumeralAlignment(value, Microsoft.UI.Xaml.FontNumeralAlignment.Tabular);
@@ -41,13 +41,13 @@ public sealed partial class MainWindow
         double r = Math.Min(s.CornerRadius, s.Height / 2);
         bool capsule = s.CornerRadius >= s.Height / 2;
         _readout[0].Value.Text = $"{s.Height:0} px";
-        _readout[0].Note.Text = Loc.F("图标 {0:0} px", s.IconSize);
+        _readout[0].Note.Text = Loc.F("Icon {0:0} px", s.IconSize);
         _readout[1].Value.Text = $"{r:0} px";
-        _readout[1].Note.Text = s.CornerRadius > r ? Loc.F("设为 {0:0}，不超过高度的一半", s.CornerRadius) : capsule ? Loc.T("G3 连续胶囊轮廓") : Loc.T("G3 连续圆角");
-        _readout[2].Value.Text = s.AutoWidth ? Loc.T("自动") : $"{s.Width:0} px";
-        _readout[2].Note.Text = s.AutoWidth ? Loc.F("最宽 {0:0} px", s.Width) : Loc.T("固定宽度");
-        _readout[3].Value.Text = capsule ? Loc.T("胶囊形") : r < 1 ? Loc.T("直角") : Loc.T("圆角矩形");
-        _readout[3].Note.Text = Loc.F("距底边 {0:0} px", s.Margin);
+        _readout[1].Note.Text = s.CornerRadius > r ? Loc.F("Set to {0:0}, at most half the height", s.CornerRadius) : capsule ? Loc.T("G3 continuous capsule outline") : Loc.T("G3 continuous corners");
+        _readout[2].Value.Text = s.AutoWidth ? Loc.T("Auto") : $"{s.Width:0} px";
+        _readout[2].Note.Text = s.AutoWidth ? Loc.F("Up to {0:0} px", s.Width) : Loc.T("Fixed width");
+        _readout[3].Value.Text = capsule ? Loc.T("Capsule") : r < 1 ? Loc.T("Square") : Loc.T("Rounded rectangle");
+        _readout[3].Note.Text = Loc.F("{0:0} px from the bottom", s.Margin);
     }
 
     // Notification previews follow the selected live layout and its existing motion curves.
@@ -90,9 +90,9 @@ public sealed partial class MainWindow
         Canvas.SetLeft(frontCard, front.X - pad); Canvas.SetTop(frontCard, front.Y - pad);
         _notifyEntrancePending |= animate;
         string caption = topRight
-            ? s.NotifyHideBody ? "主屏右上角 · 已有通知向下让位 · {0:0} 秒后收起 · 正文已隐藏"
-                               : "主屏右上角 · 已有通知向下让位 · {0:0} 秒后收起"
-            : s.NotifyHideBody ? "跟随任务栏 · {0:0} 秒后收起 · 正文已隐藏" : "跟随任务栏 · {0:0} 秒后收起";
+            ? s.NotifyHideBody ? "Primary top-right · new notifications slide in · hides after {0:0} s · content hidden"
+                               : "Primary top-right · new notifications slide in · hides after {0:0} s"
+            : s.NotifyHideBody ? "Follow the taskbar · hides after {0:0} s · content hidden" : "Follow the taskbar · hides after {0:0} s";
         NotifyCaption.Text = Loc.F(caption, s.NotifyTimeout);
 
         // Their glass: rendered over the picture where they rest; each card carries its own piece.
@@ -162,8 +162,8 @@ public sealed partial class MainWindow
     private void UpdateNotifyText(BarSettings settings)
     {
         NotifyFrontText.Margin = NotifyBackText.Margin = new Thickness(GlassSpec.InsetDip);
-        NotifyFrontBody.Text = settings.NotifyHideBody ? Loc.T("内容已隐藏") : Loc.T("明天的活动时间定了吗？我这边上午都有空，下午三点以后也可以。");
-        NotifyBackBody.Text = settings.NotifyHideBody ? Loc.T("内容已隐藏") : Loc.T("下午三点，项目讨论。");
+        NotifyFrontBody.Text = settings.NotifyHideBody ? Loc.T("Content hidden") : Loc.T("Is tomorrow's time set? I'm free all morning, or after 3 pm.");
+        NotifyBackBody.Text = settings.NotifyHideBody ? Loc.T("Content hidden") : Loc.T("3 pm, project review.");
         SetNotifyInk(_notifyDark, settings.NotifyHideBody, NotifyFrontApp, NotifyFrontTime, NotifyFrontTitle, NotifyFrontBody);
         SetNotifyInk(_notifyBackDark, settings.NotifyHideBody, NotifyBackApp, NotifyBackTime, NotifyBackTitle, NotifyBackBody);
     }
@@ -551,9 +551,9 @@ public sealed partial class MainWindow
             Ready("widgets", photoGeneration);
         }, overlays: true, scaled: true);
 
-        WidgetMapCaption.Text = !_current.Widgets ? Loc.T("桌面小组件已关闭")
-            : shown == 0 ? Loc.T("暂无小组件")
-            : Loc.F("{0} 个小组件", shown);
+        WidgetMapCaption.Text = !_current.Widgets ? Loc.T("Desktop widgets are off")
+            : shown == 0 ? Loc.T("No widgets yet")
+            : Loc.F("{0} widget(s)", shown);
         WidgetMap.Opacity = _current.Widgets ? 1 : 0.5;
     }
 

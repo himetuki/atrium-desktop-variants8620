@@ -47,8 +47,14 @@ void Settings::Clamp()
     c(nearLeave, 2, 200, d.nearLeave);
     c(dockDisplayDelay, 100, 2000, d.dockDisplayDelay);
     tint &= 0xFFFFFF;
-    if (language != L"zh" && language != L"en")
+    bool languageValid = !language.empty() && language.size() <= 32;
+    for (wchar_t ch : language)
+        if (!iswalnum(ch) && ch != L'-')
+            languageValid = false;
+    if (!languageValid)
         language = L"auto";
+    else if (language == L"zh")
+        language = L"zh-Hans";
     if (textColor != L"light" && textColor != L"dark")
         textColor = L"auto";
     if (autoHide != L"never" && autoHide != L"always")
@@ -451,16 +457,16 @@ bool SaveSettings(const Settings& s, std::wstring* warning, std::wstring* error)
             reason.pop_back();
         Log(L"settings: could not write %s (%lu)%s", path.c_str(), code, LowIntegrity() ? L", running at low integrity" : L"");
         if (error) {
-            *error = TrFormat(L"无法写入 %s：%s（错误 %lu）", path.c_str(), reason.c_str(), code);
+            *error = TrFormat(L"Could not write %s: %s (error %lu)", path.c_str(), reason.c_str(), code);
             // Below medium integrity (an executable carrying a Low label) nothing in the profile is writable.
             if (LowIntegrity())
-                *error += Tr(L"\nAtrium 正以低完整性级别运行，不能写入用户目录。请把 Atrium 解压到普通文件夹（例如 D:\\Atrium），确认 Atrium.exe 没有“低”完整性标签后重新启动。");
+                *error += Tr(L"\nAtrium is running at low integrity and cannot write to your profile. Unzip it to an ordinary folder (such as D:\\\\Atrium), make sure Atrium.exe has no Low integrity label, then start it again.");
         }
         return false;
     }
     if (startupChanged && !SetStartOnLogin(s.startOnLogin)) {
         Log(L"settings: settings saved, but Windows startup could not be changed");
-        if (warning) *warning = Tr(L"设置已保存，但未能修改 Windows 开机启动。请重新切换开机启动后再保存。");
+        if (warning) *warning = Tr(L"Settings were saved, but Windows startup could not be changed. Toggle Start with Windows again, then save.");
     }
     return true;
 }

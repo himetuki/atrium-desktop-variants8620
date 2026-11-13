@@ -20,9 +20,9 @@ internal static partial class WidgetFaces
     private const double Pad = 14; // kPad
     public static readonly Color Red = Color.FromArgb(255, 0xFF, 0x45, 0x3A), Orange = Color.FromArgb(255, 0xFF, 0x9F, 0x0A),
                                  Green = Color.FromArgb(255, 0x30, 0xD1, 0x58), Blue = Color.FromArgb(255, 0x0A, 0x84, 0xFF);
-    private static readonly string[] WeekLong = { "星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日" };
-    private static readonly string[] WeekShort = { "一", "二", "三", "四", "五", "六", "日" };
-    private static readonly string[] Months = { "一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月" };
+    private static readonly string[] WeekLong = { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
+    private static readonly string[] WeekShort = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+    private static readonly string[] Months = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
 
     // What the weather's symbols are drawn over (widget_faces.cpp, Ink).
     private enum Ink { Light, Dark, Mono }
@@ -74,20 +74,20 @@ internal static partial class WidgetFaces
     // The world clocks' cities and their Windows time zones (widget_faces.cpp, WorldCities).
     private static readonly (string Name, string Zone)[] WorldCities =
     {
-        ("北京", "China Standard Time"), ("上海", "China Standard Time"), ("香港", "China Standard Time"), ("台北", "Taipei Standard Time"),
-        ("东京", "Tokyo Standard Time"), ("首尔", "Korea Standard Time"), ("新加坡", "Singapore Standard Time"), ("曼谷", "SE Asia Standard Time"),
-        ("新德里", "India Standard Time"), ("迪拜", "Arabian Standard Time"), ("莫斯科", "Russian Standard Time"), ("伊斯坦布尔", "Turkey Standard Time"),
-        ("开罗", "Egypt Standard Time"), ("约翰内斯堡", "South Africa Standard Time"), ("柏林", "W. Europe Standard Time"), ("巴黎", "Romance Standard Time"),
-        ("伦敦", "GMT Standard Time"), ("圣保罗", "E. South America Standard Time"), ("纽约", "Eastern Standard Time"), ("多伦多", "Eastern Standard Time"),
-        ("芝加哥", "Central Standard Time"), ("丹佛", "Mountain Standard Time"), ("洛杉矶", "Pacific Standard Time"), ("温哥华", "Pacific Standard Time"),
-        ("安克雷奇", "Alaskan Standard Time"), ("檀香山", "Hawaiian Standard Time"), ("悉尼", "AUS Eastern Standard Time"), ("墨尔本", "AUS Eastern Standard Time"),
-        ("奥克兰", "New Zealand Standard Time"),
+        ("Beijing", "China Standard Time"), ("Shanghai", "China Standard Time"), ("Hong Kong", "China Standard Time"), ("Taipei", "Taipei Standard Time"),
+        ("Tokyo", "Tokyo Standard Time"), ("Seoul", "Korea Standard Time"), ("Singapore", "Singapore Standard Time"), ("Bangkok", "SE Asia Standard Time"),
+        ("New Delhi", "India Standard Time"), ("Dubai", "Arabian Standard Time"), ("Moscow", "Russian Standard Time"), ("Istanbul", "Turkey Standard Time"),
+        ("Cairo", "Egypt Standard Time"), ("Johannesburg", "South Africa Standard Time"), ("Berlin", "W. Europe Standard Time"), ("Paris", "Romance Standard Time"),
+        ("London", "GMT Standard Time"), ("São Paulo", "E. South America Standard Time"), ("New York", "Eastern Standard Time"), ("Toronto", "Eastern Standard Time"),
+        ("Chicago", "Central Standard Time"), ("Denver", "Mountain Standard Time"), ("Los Angeles", "Pacific Standard Time"), ("Vancouver", "Pacific Standard Time"),
+        ("Anchorage", "Alaskan Standard Time"), ("Honolulu", "Hawaiian Standard Time"), ("Sydney", "AUS Eastern Standard Time"), ("Melbourne", "AUS Eastern Standard Time"),
+        ("Auckland", "New Zealand Standard Time"),
     };
 
     // WidgetCities: the widget's own choice where it made one, else the defaults.
     private static string[] CitiesOf(string kind, IReadOnlyList<string>? chosen)
     {
-        string[] cities = kind == "digital" ? new[] { "东京", "伦敦", "纽约" } : new[] { "北京", "东京", "伦敦", "纽约" };
+        string[] cities = kind == "digital" ? new[] { "Tokyo", "London", "New York" } : new[] { "Beijing", "Tokyo", "London", "New York" };
         for (int i = 0; i < cities.Length && chosen != null && i < chosen.Count; i++)
             if (WorldCities.Any(c => c.Name == chosen[i])) cities[i] = chosen[i];
         return cities;
@@ -106,7 +106,7 @@ internal static partial class WidgetFaces
         double hours = Math.Round((t - now).TotalMinutes / 15) / 4;
         int dd = t.Date.CompareTo(now.Date);
         string offset = (hours >= 0 ? "+" : "") + hours.ToString("0.##", CultureInfo.InvariantCulture);
-        string template = dd > 0 ? "明天 {0}小时" : dd < 0 ? "昨天 {0}小时" : "今天 {0}小时";
+        string template = dd > 0 ? "Tomorrow {0} h" : dd < 0 ? "Yesterday {0} h" : "Today {0} h";
         return (t, Loc.F(template, offset));
     }
 
@@ -126,7 +126,7 @@ internal static partial class WidgetFaces
         switch (kind)
         {
             case "clock" when size == "small":
-                ClockFace(c, w / 2, h / 2, h / 2 - 9, now, p.Face, p.Text, true, Loc.T("北京"), p.Sub, p);
+                ClockFace(c, w / 2, h / 2, h / 2 - 9, now, p.Face, p.Text, true, Loc.T("Beijing"), p.Sub, p);
                 break;
             case "clock":
             {
@@ -147,7 +147,7 @@ internal static partial class WidgetFaces
             case "digital":
             {
                 double leftW = size == "small" ? w - 2 * Pad : 150;
-                Text(c, Loc.T("本地"), Pad + 2, Pad, Pad + leftW, Pad + 18, 12.5, p.Sub, 2, 0, p);
+                Text(c, Loc.T("Local"), Pad + 2, Pad, Pad + leftW, Pad + 18, 12.5, p.Sub, 2, 0, p);
                 // Match the core's fixed daily size, with one DIP of glyph-rounding headroom.
                 double fit = TextWidth("00:00", 50, "TitleFont");
                 double timeW = leftW - 1;
@@ -180,7 +180,7 @@ internal static partial class WidgetFaces
                     // A desktop: the ring full, a plug, plugged in (PaintBattery).
                     Arc(c, cx, cy, R, -90, 360, p.Green, 9, false);
                     Glyph(c, "\uE83E", cx - 22, cy - 22, cx + 22, cy + 22, 22, p.Text);
-                    Text(c, Loc.T("已接通电源"), 0, cy + R + 12, w, cy + R + 34, 13, p.Text, 2, 1, p);
+                    Text(c, Loc.T("Plugged in"), 0, cy + R + 12, w, cy + R + 34, 13, p.Text, 2, 1, p);
                     break;
                 }
                 var (fill, charging, low) = BarFace.Battery();
@@ -196,7 +196,7 @@ internal static partial class WidgetFaces
             case "bluetooth":
             {
                 // PaintBluetooth, with examples: the gallery does not read the devices.
-                (string Glyph, string Name, int Pct)[] d = { ("\uE7F6", Loc.T("耳机"), 82), ("\uE765", Loc.T("键盘"), 64), ("\uE962", Loc.T("鼠标"), 18), ("\uE7FC", Loc.T("手柄"), 45) };
+                (string Glyph, string Name, int Pct)[] d = { ("\uE7F6", Loc.T("Headphones"), 82), ("\uE765", Loc.T("Keyboard"), 64), ("\uE962", Loc.T("Mouse"), 18), ("\uE7FC", Loc.T("Gamepad"), 45) };
                 Color Col(int v) => v <= 20 ? p.Red : p.Green;
                 if (size == "small")
                 {
@@ -233,8 +233,8 @@ internal static partial class WidgetFaces
                 double graphTop = GraphTop(downCurve, upCurve);
                 bool compact = size == "small";
                 double pad = compact ? Pad : 16;
-                Text(c, "网络", pad + 1, pad - 2, w - pad - 40, pad + 16, compact ? 12.5 : 13.5, p.Sub, 2, 0, p);
-                if (!compact) Text(c, "以太网 · 1.0 Gbps", w / 2 - 60, pad - 1, w - pad - 1, pad + 16, 11, p.Sub, 0, 2, p);
+                Text(c, Loc.T("Network"), pad + 1, pad - 2, w - pad - 40, pad + 16, compact ? 12.5 : 13.5, p.Sub, 2, 0, p);
+                if (!compact) Text(c, Loc.T("Ethernet · 1.0 Gbps"), w / 2 - 60, pad - 1, w - pad - 1, pad + 16, 11, p.Sub, 0, 2, p);
                 // A rate: its arrow, the value, the unit on the same baseline (MiSans: 1.044 em down).
                 void Rate(double top, double bottom, double bps, bool outRate, double arrow, double font, double unitSize)
                 {
@@ -253,7 +253,7 @@ internal static partial class WidgetFaces
                     Line(c, pad, 126, w - pad, 126, p.Track, 1);
                     GraphLine(c, downCurve, graphTop, pad, 90, w - pad, 126, downInk);
                     GraphLine(c, upCurve, graphTop, pad, 90, w - pad, 126, upInk);
-                    Text(c, "以太网", pad + 1, h - pad - 14, w - pad, h - pad + 1, 10, p.Sub, 0, 0, p);
+                    Text(c, Loc.T("Ethernet"), pad + 1, h - pad - 14, w - pad, h - pad + 1, 10, p.Sub, 0, 0, p);
                     break;
                 }
                 Rate(34, 72, down, false, 8, 32, 12.5);
@@ -261,16 +261,16 @@ internal static partial class WidgetFaces
                 Line(c, pad, 136, w - pad, 136, p.Track, 1);
                 GraphLine(c, downCurve, graphTop, pad, 102, w - pad, 136, downInk);
                 GraphLine(c, upCurve, graphTop, pad, 102, w - pad, 136, upInk);
-                Text(c, "本次接收 1.24 GB · 发送 86.0 MB", pad, 140, w - pad, 154, 10, p.Sub, 0, 0, p);
+                Text(c, Loc.T("Received 1.24 GB · Sent 86.0 MB this session"), pad, 140, w - pad, 154, 10, p.Sub, 0, 0, p);
                 break;
             }
             case "system":
             {
-                (string Name, double V, string Detail)[] g = { ("CPU", 0.23, Loc.T("处理器")), (Loc.T("内存"), 0.58, "9.2 / 16 GB"), (Loc.T("磁盘"), 0.74, Loc.T("214 GB 可用")) };
+                (string Name, double V, string Detail)[] g = { ("CPU", 0.23, Loc.T("CPU")), (Loc.T("Memory"), 0.58, "9.2 / 16 GB"), (Loc.T("Disk"), 0.74, Loc.T("214 GB free")) };
                 Color Col(double v) => v >= 0.9 ? p.Red : v >= 0.7 ? p.Orange : p.Green;
                 if (size == "small")
                 {
-                    Text(c, Loc.T("系统"), Pad + 2, Pad - 2, w - Pad, Pad + 16, 12.5, p.Sub, 2, 0, p);
+                    Text(c, Loc.T("System"), Pad + 2, Pad - 2, w - Pad, Pad + 16, 12.5, p.Sub, 2, 0, p);
                     double rowH = (h - 2 * Pad - 18) / 3;
                     for (int i = 0; i < 3; i++)
                     {
@@ -295,14 +295,14 @@ internal static partial class WidgetFaces
                 break;
             }
             case "notes":
-                Text(c, Loc.T("备忘录"), Pad + 2, Pad - 2, w - Pad, Pad + 18, 13.5, p.Orange, 2, 0, p);
-                Paragraph(c, size == "small" ? Loc.T("周五前交设计评审\n换上新的壁纸") : Loc.T("周五前交设计评审\n换上新的壁纸\n试试磨砂预设"),
+                Text(c, Loc.T("Notes"), Pad + 2, Pad - 2, w - Pad, Pad + 18, 13.5, p.Orange, 2, 0, p);
+                Paragraph(c, size == "small" ? Loc.T("Design review by Friday\nChange the wallpaper") : Loc.T("Design review by Friday\nChange the wallpaper\nTry the frosted preset"),
                           Pad + 2, Pad + 24, w - Pad - 2, h - Pad, 13.5, p.Text, p);
                 break;
             case "reminders":
             {
-                (string Text, bool Done)[] items = { (Loc.T("给桌面拍一组截图"), false), (Loc.T("整理本周的会议记录"), false), (Loc.T("订周末的电影票"), true) };
-                Text(c, Loc.T("提醒事项"), Pad + 2, Pad - 2, w - Pad - 40, Pad + 18, 13.5, p.Orange, 2, 0, p);
+                (string Text, bool Done)[] items = { (Loc.T("Take desktop screenshots"), false), (Loc.T("Tidy this week's meeting notes"), false), (Loc.T("Book weekend movie tickets"), true) };
+                Text(c, Loc.T("Reminders"), Pad + 2, Pad - 2, w - Pad - 40, Pad + 18, 13.5, p.Orange, 2, 0, p);
                 Text(c, "2", w - Pad - 48, Pad - 6, w - Pad - 2, Pad + 22, 22, p.Orange, 2, 2, p);
                 const double RowH = 27, Top = Pad + 28;
                 int slots = Math.Max(1, (int)((h - Pad - Top) / RowH));
@@ -325,7 +325,7 @@ internal static partial class WidgetFaces
                 {
                     double y = Top + RowH * shown;
                     Text(c, "+", Pad - 1, y, Pad + 19, y + RowH, 17, p.Faint, 0, 1, p);
-                    Text(c, Loc.T("新提醒"), Pad + 26, y, w - Pad, y + RowH, 13.5, p.Faint, 0, 0, p);
+                    Text(c, Loc.T("New Reminder"), Pad + 26, y, w - Pad, y + RowH, 13.5, p.Faint, 0, 0, p);
                 }
                 break;
             }
@@ -408,15 +408,15 @@ internal static partial class WidgetFaces
     internal static string DayLabel(DateTime t, out bool festival)
     {
         festival = true;
-        if (t.Month == 1 && t.Day == 1) return Loc.T("元旦");
-        if (t.Month == 5 && t.Day == 1) return Loc.T("劳动节");
-        if (t.Month == 10 && t.Day == 1) return Loc.T("国庆节");
+        if (t.Month == 1 && t.Day == 1) return Loc.T("New Year's Day");
+        if (t.Month == 5 && t.Day == 1) return Loc.T("Labour Day");
+        if (t.Month == 10 && t.Day == 1) return Loc.T("National Day");
         var (m, d, leap) = ToLunar(t);
         if (!leap)
         {
-            (int M, int D, string Name)[] fests = { (1, 1, Loc.T("春节")), (1, 15, Loc.T("元宵节")), (5, 5, Loc.T("端午节")), (7, 7, Loc.T("七夕")), (8, 15, Loc.T("中秋节")), (9, 9, Loc.T("重阳节")), (12, 8, Loc.T("腊八节")) };
+            (int M, int D, string Name)[] fests = { (1, 1, Loc.T("Spring Festival")), (1, 15, Loc.T("Lantern Festival")), (5, 5, Loc.T("Dragon Boat Festival")), (7, 7, Loc.T("Qixi Festival")), (8, 15, Loc.T("Mid-Autumn Festival")), (9, 9, Loc.T("Double Ninth Festival")), (12, 8, Loc.T("Laba Festival")) };
             foreach (var f in fests) if (f.M == m && f.D == d) return Loc.T(f.Name);
-            if (m == 12 && ToLunar(t.AddDays(1)) is (1, 1, false)) return Loc.T("除夕");
+            if (m == 12 && ToLunar(t.AddDays(1)) is (1, 1, false)) return Loc.T("New Year's Eve");
         }
         festival = false;
         if (Loc.English) return "";
@@ -456,7 +456,7 @@ internal static partial class WidgetFaces
         Text(c, Loc.T(WeekLong[Weekday(now)]), Pad + 2, Pad, Pad + leftW, Pad + 20, 14, p.Blue, 2, 0, p);
         Text(c, now.Day.ToString(), Pad, Pad + 16, Pad + leftW, Pad + 80, 54, p.Text, 0, 0, p);
         string todayLabel = DayLabel(now, out bool fest);
-        Text(c, Loc.English ? LunarMonthDay(now) : Loc.F("农历{0}", LunarMonthDay(now)), Pad + 2, h - Pad - 40, Pad + leftW, h - Pad - 20, 12.5, p.Text, 2, 0, p);
+        Text(c, Loc.English ? LunarMonthDay(now) : Loc.F("Lunar {0}", LunarMonthDay(now)), Pad + 2, h - Pad - 40, Pad + leftW, h - Pad - 20, 12.5, p.Text, 2, 0, p);
         Text(c, fest ? todayLabel : (Loc.English ? $"{now.Year} {Loc.T(Months[now.Month - 1])}" : $"{now.Year}年{Loc.T(Months[now.Month - 1])}"),
              Pad + 2, h - Pad - 20, Pad + leftW, h - Pad, 12, fest ? p.Blue : p.Sub, 0, 0, p);
         if (size == "small") return;

@@ -71,7 +71,7 @@ internal sealed class CoreClient : IDisposable
             if (expected == null || !string.Equals(process.MainModule?.FileName, expected, StringComparison.OrdinalIgnoreCase))
             {
                 _connectionLost = true;
-                ConnectionError = Loc.T("另一位置的 Atrium 正在运行，未连接本目录中的核心。");
+                ConnectionError = Loc.T("Atrium is running from another location; the core in this folder was not connected.");
                 pipe.Dispose();
                 return false;
             }
@@ -88,7 +88,7 @@ internal sealed class CoreClient : IDisposable
             if (e is not TimeoutException and not OperationCanceledException)
             {
                 _connectionLost = true;
-                ConnectionError = Loc.F("无法连接本目录中的核心：{0}", e.Message);
+                ConnectionError = Loc.F("Could not connect to the core in this folder: {0}", e.Message);
             }
             pipe.Dispose();
             return false;
@@ -130,7 +130,7 @@ internal sealed class CoreClient : IDisposable
                 int n = await pipe.ReadAsync(_readBuffer, deadline.Token);
                 if (n == 0) throw new IOException("pipe closed");
                 message.Write(_readBuffer, 0, n);
-                if (message.Length > 1024 * 1024) throw new IOException(Loc.T("核心回复过大"));
+                if (message.Length > 1024 * 1024) throw new IOException(Loc.T("The core's reply was too large"));
             } while (!pipe.IsMessageComplete);
             return JsonNode.Parse(message.GetBuffer().AsSpan(0, (int)message.Length)) as JsonObject;
         }
@@ -139,7 +139,7 @@ internal sealed class CoreClient : IDisposable
             if (ReferenceEquals(pipe, _pipe))
             {
                 _connectionLost = true;
-                ConnectionError = Loc.T("核心未响应或连接已中断，尚未确认运行状态。");
+                ConnectionError = Loc.T("The core did not respond or the connection was lost; the running state is not confirmed.");
                 Disconnect();
             }
             return null;
@@ -171,7 +171,7 @@ internal sealed class CoreClient : IDisposable
         if (Connected)
             return await Send("commit", s);
         if (_connectionLost || _lifetime.IsCancellationRequested)
-            return Loc.T("核心连接已中断，尚未确认保存结果。请重新连接后检查已保存的设置。");
+            return Loc.T("The connection to the core was lost; the save result is not confirmed. Reconnect and check the saved settings.");
         try
         {
             LastSaveWarning = WriteFile(s);
@@ -189,7 +189,7 @@ internal sealed class CoreClient : IDisposable
     public async Task<string?> AddWidgetAsync(string kind, string size)
     {
         var r = await RequestAsync(new JsonObject { ["op"] = "add-widget", ["kind"] = kind, ["size"] = size });
-        if (r == null) return Loc.T("Atrium 未运行");
+        if (r == null) return Loc.T("Atrium is not running");
         return r["op"]?.GetValue<string>() == "ok" ? null : r["message"]?.GetValue<string>() ?? "error";
     }
 
@@ -201,7 +201,7 @@ internal sealed class CoreClient : IDisposable
         bool connected = Connected;
         var r = await RequestAsync(request);
         // Not connected: nothing to preview. A connection lost on the way: not done.
-        if (r == null) return connected || _connectionLost ? Loc.T("核心未在期限内回复或连接已关闭，尚未确认操作结果。请重新连接。") : null;
+        if (r == null) return connected || _connectionLost ? Loc.T("The core did not reply in time or the connection closed; the result is not confirmed. Please reconnect.") : null;
         if (op == "commit") LastSaveWarning = r["warning"]?.GetValue<string>();
         return r["op"]?.GetValue<string>() == "ok" ? null : r["message"]?.GetValue<string>() ?? "error";
     }
@@ -251,7 +251,7 @@ internal sealed class CoreClient : IDisposable
         try
         {
             using var run = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
-            var exe = CoreExe() ?? throw new FileNotFoundException(Loc.T("没有找到 Atrium.exe"));
+            var exe = CoreExe() ?? throw new FileNotFoundException(Loc.T("Atrium.exe was not found"));
             var command = $"\"{exe}\"";
             if (s.StartOnLogin)
             {
@@ -260,14 +260,14 @@ internal sealed class CoreClient : IDisposable
             else
             {
                 if (run.GetValue("Atrium") is string owner && !string.Equals(owner, command, StringComparison.OrdinalIgnoreCase))
-                    throw new IOException(Loc.T("该开机启动项属于另一位置的 Atrium"));
+                    throw new IOException(Loc.T("That startup entry belongs to Atrium in another location"));
                 RemoveLogonTask(exe);
                 run.DeleteValue("Atrium", throwOnMissingValue: false);
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
-            return Loc.F("设置已保存，但未能修改 Windows 开机启动：{0}。请重新切换开机启动后再保存。", e.Message);
+            return Loc.F("Settings were saved, but Windows startup could not be changed: {0}. Toggle Start with Windows again, then save.", e.Message);
         }
         return null;
     }
@@ -287,7 +287,7 @@ internal sealed class CoreClient : IDisposable
             catch (COMException e) when (e.HResult == unchecked((int)0x80070002)) { return; } // no task
             string command = ((string)task.Definition.Actions.Item(1).Path).Trim('"');
             if (!string.Equals(command, exe, StringComparison.OrdinalIgnoreCase))
-                throw new IOException(Loc.T("该开机启动项属于另一位置的 Atrium"));
+                throw new IOException(Loc.T("That startup entry belongs to Atrium in another location"));
             folder.DeleteTask(name, 0);
         }
         catch (COMException e)

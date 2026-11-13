@@ -11,7 +11,7 @@ dotnet build settings/Atrium.Settings/Atrium.Settings.csproj -c Release -p:Atriu
 pwsh ./tools/check-localization.ps1
 ```
 
-`check-localization.ps1` 检查 `Tr` / `TrFormat` / `Loc.T` / `Loc.F` 以及 XAML 的 `Text` / `Title` / `Note` / `Content` / `SwitchName` 等静态文案是否有词典条目、词典键是否重复，以及中英文格式占位符是否一致；CI 在构建前运行同一脚本。
+`check-localization.ps1` 检查 English 源码 key（`Tr` / `TrFormat` / `Loc.T` / `Loc.F` 以及 XAML 的 `Text` / `Title` / `Note` / `Content` / `SwitchName` 等静态文案）在 `locales/*.json` 中是否有条目、key 是否重复，以及各语言格式占位符是否一致；CI 在构建前运行同一脚本。
 
 自动检查覆盖两端配置往返、旧配置默认值、非法输入、保存状态、时钟显秒开关（默认关闭、可单独预览），材质预设保留显示器设置、显示器枚举、断开重连回退，以及三种应用分屏规则（多窗口应用、跨屏移动、固定应用和活动标记）。原生规则使用模拟显示器和窗口，不修改系统显示布局。
 

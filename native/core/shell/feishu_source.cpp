@@ -213,7 +213,7 @@ void FeishuSource::Run()
                         continue;
                     auto* n = new Notice();
                     n->source = L"feishu";
-                    n->app = Tr(L"飞书");
+                    n->app = Tr(L"Feishu");
                     n->appId = procs.at(pid);
                     n->title = t[0];
                     for (size_t i = 1; i < t.size(); ++i)

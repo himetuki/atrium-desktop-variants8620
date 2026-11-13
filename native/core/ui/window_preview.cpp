@@ -262,7 +262,7 @@ void WindowPreview::Paint(Canvas& c)
             textLeft += 22;
         }
         float textRight = card.rect.right - kCardPad - (hv > 0.01f ? 28 : 2);
-        c.Text(card.title.empty() ? Tr(L"窗口") : card.title, D2D1::RectF(textLeft, ty - 2, textRight, ty + kTitleH - 2), 12.5f, t.text,
+        c.Text(card.title.empty() ? Tr(L"Windows") : card.title, D2D1::RectF(textLeft, ty - 2, textRight, ty + kTitleH - 2), 12.5f, t.text,
                DWRITE_FONT_WEIGHT_MEDIUM);
         if (hv > 0.01f) {
             D2D1_COLOR_F plate = int(i) == hover_ && overClose_ ? D2D1::ColorF(0.91f, 0.27f, 0.23f, 0.95f * hv) : Alpha(t.hover, hv);

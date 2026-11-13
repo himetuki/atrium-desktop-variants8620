@@ -12,7 +12,7 @@ internal static class ReleaseInstaller
 {
     internal sealed record Prepared(string Tag, string Version, string Directory);
     internal static string InstallDirectory => Path.GetDirectoryName(CoreClient.CoreExe()
-        ?? throw new IOException(Loc.T("找不到 Atrium 程序目录。")))!;
+        ?? throw new IOException(Loc.T("Could not find the Atrium program folder.")))!;
     internal static string CacheDirectory => Path.Combine(Path.GetDirectoryName(CoreClient.SettingsPath)!, "Updates",
         Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(InstallDirectory.ToUpperInvariant())))[..16]);
     private static string StatePath => Path.Combine(CacheDirectory, "ready.json");
@@ -27,7 +27,7 @@ internal static class ReleaseInstaller
         var ready = ReadJson<Prepared>(StatePath);
         if (ready == null || !Version.TryParse(ready.Version, out var version) || version <= current) return null;
         if (!Path.GetFullPath(ready.Directory).StartsWith(CacheDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            throw new IOException(Loc.T("更新缓存路径无效，请重新下载。"));
+            throw new IOException(Loc.T("The update cache path is invalid. Download again."));
         ValidatePackage(ready.Directory, version);
         return ready;
     }
@@ -45,11 +45,11 @@ internal static class ReleaseInstaller
     {
         var start = BackgroundStart("--queue-update");
         start.ArgumentList.Add(Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(release))));
-        return Process.Start(start) ?? throw new IOException(Loc.T("无法开始后台下载，请重试。"));
+        return Process.Start(start) ?? throw new IOException(Loc.T("Could not start the background download. Please try again."));
     }
 
     internal static Process ResumeBackgroundDownload() => Process.Start(BackgroundStart("--resume-update"))
-        ?? throw new IOException(Loc.T("无法恢复后台下载，请重试。"));
+        ?? throw new IOException(Loc.T("Could not resume the background download. Try again."));
 
     private static ProcessStartInfo BackgroundStart(string command)
     {
@@ -62,16 +62,16 @@ internal static class ReleaseInstaller
     {
         var download = ReadDownload();
         if (download == null || download.Release.Version <= CurrentVersion) return null;
-        if (download.Error != null) return new(Loc.T("更新准备失败，请重试"), true);
+        if (download.Error != null) return new(Loc.T("Could not prepare the update. Try again."), true);
         using var job = BitsTransfer.Open(download.Job);
         if (job == null) return File.Exists(Path.Combine(WorkDirectory, "release.zip"))
-            ? new(Loc.T("正在准备更新…")) : new(Loc.T("下载未完成，请重试"), true);
-        if (job.CurrentState == BitsTransfer.State.Error) return new(Loc.T("后台下载失败，请重试"), true);
-        if (job.CurrentState == BitsTransfer.State.Transferred) return new(Loc.T("正在准备更新…"));
-        if (job.CurrentState == BitsTransfer.State.TransientError) return new(Loc.T("等待恢复后台下载…"));
+            ? new(Loc.T("Preparing the update…")) : new(Loc.T("The download did not finish. Try again."), true);
+        if (job.CurrentState == BitsTransfer.State.Error) return new(Loc.T("The background download failed. Try again."), true);
+        if (job.CurrentState == BitsTransfer.State.Transferred) return new(Loc.T("Preparing the update…"));
+        if (job.CurrentState == BitsTransfer.State.TransientError) return new(Loc.T("Waiting to resume the background download…"));
         var progress = job.CurrentProgress;
         return new(progress.Total is > 0 and < ulong.MaxValue
-            ? Loc.F("正在后台下载… {0}%", Math.Min(100, progress.Transferred * 100 / progress.Total)) : Loc.T("正在后台下载…"));
+            ? Loc.F("Downloading in background… {0}%", Math.Min(100, progress.Transferred * 100 / progress.Total)) : Loc.T("Downloading in background…"));
     }
 
     private static Version CurrentVersion => typeof(ReleaseInstaller).Assembly.GetName().Version!;
@@ -82,7 +82,7 @@ internal static class ReleaseInstaller
         {
             // The worker atomically replaces/removes state as the UI reads progress.
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-            return JsonSerializer.Deserialize<T>(stream) ?? throw new JsonException(Loc.F("更新状态为空或不完整：{0}", Path.GetFileName(path)));
+            return JsonSerializer.Deserialize<T>(stream) ?? throw new JsonException(Loc.F("The update state is empty or incomplete: {0}", Path.GetFileName(path)));
         }
         catch (FileNotFoundException) { return default; }
         catch (DirectoryNotFoundException) { return default; }
@@ -136,12 +136,12 @@ internal static class ReleaseInstaller
                 {
                     // A known transfer keeps its identity. Unknown/unreadable
                     // state is left intact, including any recoverable package.
-                    SaveJson(Path.Combine(cache, "result.json"), new { error = Loc.F("更新未完成：{0}", error.Message) });
+                    SaveJson(Path.Combine(cache, "result.json"), new { error = Loc.F("The update did not finish: {0}", error.Message) });
                     File.WriteAllText(Path.Combine(cache, "worker-error.txt"), error.ToString());
                     if (pending != null) SaveJson(DownloadPath, pending with { Error = error.Message });
                 }
                 catch (Exception reporting) when (reporting is IOException or UnauthorizedAccessException)
-                { App.LogCrash(new AggregateException(Loc.T("无法写入更新错误状态"), error, reporting)); }
+                { App.LogCrash(new AggregateException(Loc.T("Could not write the update error state"), error, reporting)); }
             }
             return args[0] == "--finish-update" ? 0 : 1; // permanent failures wait for a retry, not callback loops
         }
@@ -200,7 +200,7 @@ internal static class ReleaseInstaller
             if (job != null)
             {
                 if (job.CurrentState == BitsTransfer.State.Error)
-                { SaveJson(DownloadPath, pending with { Error = Loc.T("后台下载失败") }); return; }
+                { SaveJson(DownloadPath, pending with { Error = Loc.T("The background download failed") }); return; }
                 if (job.CurrentState != BitsTransfer.State.Transferred) return;
                 job.Complete();
             }
@@ -210,7 +210,7 @@ internal static class ReleaseInstaller
         {
             using var stream = File.OpenRead(zip);
             string actual = "sha256:" + Convert.ToHexString(SHA256.HashData(stream));
-            if (!actual.Equals(digest, StringComparison.OrdinalIgnoreCase)) throw new IOException(Loc.T("更新包校验失败，请重新下载。"));
+            if (!actual.Equals(digest, StringComparison.OrdinalIgnoreCase)) throw new IOException(Loc.T("The update package failed verification. Download again."));
         }
         string unpacked = Path.Combine(WorkDirectory, "unpacked");
         if (Directory.Exists(unpacked)) Directory.Delete(unpacked, true); // an interrupted extraction, not transfer data
@@ -246,12 +246,12 @@ internal static class ReleaseInstaller
         string core = Path.Combine(directory, "Atrium.exe");
         string settings = Path.Combine(directory, "Settings", "Atrium.Settings.exe");
         if (!File.Exists(core) || !File.Exists(settings) || !File.Exists(Path.ChangeExtension(settings, ".dll")))
-            throw new IOException(Loc.T("更新包缺少程序文件，请重新下载。"));
+            throw new IOException(Loc.T("The update package is missing program files. Download again."));
         var info = FileVersionInfo.GetVersionInfo(core);
         var version = new Version(info.FileMajorPart, info.FileMinorPart, info.FileBuildPart, info.FilePrivatePart);
         var settingsInfo = FileVersionInfo.GetVersionInfo(Path.ChangeExtension(settings, ".dll"));
         var settingsVersion = new Version(settingsInfo.FileMajorPart, settingsInfo.FileMinorPart, settingsInfo.FileBuildPart, settingsInfo.FilePrivatePart);
-        if (version != expected || settingsVersion != expected) throw new IOException(Loc.T("更新包与发布版本不一致，请重新下载。"));
+        if (version != expected || settingsVersion != expected) throw new IOException(Loc.T("The update package does not match the release. Download again."));
     }
 
     internal static void Restart(Prepared ready, bool startCore)
@@ -271,6 +271,6 @@ internal static class ReleaseInstaller
         string probe = Path.Combine(Path.GetDirectoryName(InstallDirectory)!, ".atrium-update-" + Guid.NewGuid().ToString("N"));
         using (File.Create(probe)) { }
         File.Delete(probe);
-        using var helper = Process.Start(start) ?? throw new IOException(Loc.T("无法启动更新，请重试。"));
+        using var helper = Process.Start(start) ?? throw new IOException(Loc.T("Could not start the update. Try again."));
     }
 }

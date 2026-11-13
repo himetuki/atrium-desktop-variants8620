@@ -31,48 +31,48 @@ public sealed partial class MainWindow : Window
 
     private SliderDef[] Sliders => new SliderDef[]
     {
-        new("clarity", Loc.T("透明度"), 0, 100, 1, "%",
+        new("clarity", Loc.T("Transparency"), 0, 100, 1, "%",
             s => s.Transparency * 100, (s, v) => s.Transparency = v / 100, true),
-        new("clarity", Loc.T("模糊"), 0, 100, 1, "%",
+        new("clarity", Loc.T("Blur"), 0, 100, 1, "%",
             s => s.Blur * 100, (s, v) => s.Blur = v / 100, true),
-        new("edge", Loc.T("折射强度"), 0, 60, 1, "px",
+        new("edge", Loc.T("Refraction"), 0, 60, 1, "px",
             s => s.Refraction, (s, v) => s.Refraction = v, true),
-        new("edge", Loc.T("折射边缘宽度"), 1, 80, 1, "px",
+        new("edge", Loc.T("Refraction edge"), 1, 80, 1, "px",
             s => s.Edge, (s, v) => s.Edge = v, true),
-        new("edge", Loc.T("色散"), 0, 50, 1, "%",
+        new("edge", Loc.T("Dispersion"), 0, 50, 1, "%",
             s => s.Dispersion * 100, (s, v) => s.Dispersion = v / 100, true),
-        new("light", Loc.T("高光"), 0, 100, 1, "%",
+        new("light", Loc.T("Highlight"), 0, 100, 1, "%",
             s => s.Highlight * 100, (s, v) => s.Highlight = v / 100, true),
-        new("light", Loc.T("阴影"), 0, 100, 1, "%",
+        new("light", Loc.T("Shadow"), 0, 100, 1, "%",
             s => s.Shadow * 100, (s, v) => s.Shadow = v / 100, true),
 
-        new("size", Loc.T("高度"), 32, 120, 1, "px",
+        new("size", Loc.T("Height"), 32, 120, 1, "px",
             s => s.Height, (s, v) => s.Height = v, false),
-        new("size", Loc.T("圆角"), 0, 80, 1, "px",
+        new("size", Loc.T("Corner radius"), 0, 80, 1, "px",
             s => s.CornerRadius, (s, v) => s.CornerRadius = v, false),
-        new("dock", Loc.T("图标大小"), 16, 64, 1, "px",
+        new("dock", Loc.T("Icon size"), 16, 64, 1, "px",
             s => s.IconSize, (s, v) => s.IconSize = v, false),
-        new("width", Loc.T("最大宽度"), 300, 2400, 10, "px",
+        new("width", Loc.T("Maximum width"), 300, 2400, 10, "px",
             s => s.Width, (s, v) => s.Width = v, false),
-        new("dock", Loc.T("底部间距"), 0, 200, 1, "px",
+        new("dock", Loc.T("Bottom spacing"), 0, 200, 1, "px",
             s => s.Margin, (s, v) => s.Margin = v, false),
-        new("dock", Loc.T("悬停放大"), 100, 200, 5, "%",
+        new("dock", Loc.T("Hover magnification"), 100, 200, 5, "%",
             s => s.Magnify * 100, (s, v) => s.Magnify = v / 100, false),
 
         // The band above the bar that answers the pointer ahead of time (riseNear, magnifyNear).
-        new("near", Loc.T("进入距离"), 4, 160, 2, "px",
+        new("near", Loc.T("Enter distance"), 4, 160, 2, "px",
             s => s.NearEnter, (s, v) => s.NearEnter = v, false),
-        new("near", Loc.T("离开距离"), 4, 200, 2, "px",
+        new("near", Loc.T("Leave distance"), 4, 200, 2, "px",
             s => s.NearLeave, (s, v) => s.NearLeave = v, false),
 
-        new("notify", Loc.T("停留时间"), 3, 30, 1, "s",
+        new("notify", Loc.T("Popup duration"), 3, 30, 1, "s",
             s => s.NotifyTimeout, (s, v) => s.NotifyTimeout = v, false),
     };
 
     private static string[] PageTitles => new[]
     {
-        Loc.T("材质"), Loc.T("形状"), Loc.T("任务栏"), Loc.T("通知"), Loc.T("小组件"), Loc.T("台前调度"), Loc.T("显示器"), Loc.T("系统"), Loc.T("设计语言"), Loc.T("关于"),
-        Loc.T("开始菜单"), Loc.T("托盘"), Loc.T("状态栏"), Loc.T("时间"), // the bar's parts, listed under it
+        Loc.T("Material"), Loc.T("Shape"), Loc.T("Taskbar"), Loc.T("Notifications"), Loc.T("Widgets"), Loc.T("Stage Manager"), Loc.T("Displays"), Loc.T("System"), Loc.T("Design language"), Loc.T("About"),
+        Loc.T("Start menu"), Loc.T("Tray"), Loc.T("Status bar"), Loc.T("Time"), // the bar's parts, listed under it
     };
     private readonly CoreClient _client = new();
     private readonly List<(SliderDef Def, SliderTile Tile)> _rows = new();
@@ -94,6 +94,7 @@ public sealed partial class MainWindow : Window
     public MainWindow(int startPage = -1)
     {
         InitializeComponent();
+        PopulateLanguagePicker();
         Title = App.WindowTitle;
         Loc.Localize(RootGrid);
         // The inspector lives in its own ScrollViewer; localize it directly as
@@ -175,9 +176,9 @@ public sealed partial class MainWindow : Window
         };
         PathText.Text = CoreClient.SettingsPath;
         StartupSwitch.IsEnabled = !CoreClient.Development;
-        if (CoreClient.Development) ToolTipService.SetToolTip(StartupSwitch, Loc.T("开发构建不修改 Windows 开机启动项。"));
+        if (CoreClient.Development) ToolTipService.SetToolTip(StartupSwitch, Loc.T("Development builds do not change Windows startup."));
         var v = typeof(MainWindow).Assembly.GetName().Version;
-        VersionText.Text = Loc.F("版本 {0}", v?.ToString(3) ?? "1.0.0");
+        VersionText.Text = Loc.F("Version {0}", v?.ToString(3) ?? "1.0.0");
         ShowStatus(false);
         // `--page widgets` (the widgets' menu): open on that page.
         var args = Environment.GetCommandLineArgs();
@@ -363,13 +364,13 @@ public sealed partial class MainWindow : Window
             panel.Children.Insert(at, tile);
             placed[d.Group] = at + 1;
         }
-        AutoWidthSwitch.GotFocus += (_, _) => OnEngage(Loc.T("最大宽度"), true);
-        AutoWidthSwitch.LostFocus += (_, _) => OnEngage(Loc.T("最大宽度"), false);
+        AutoWidthSwitch.GotFocus += (_, _) => OnEngage(Loc.T("Maximum width"), true);
+        AutoWidthSwitch.LostFocus += (_, _) => OnEngage(Loc.T("Maximum width"), false);
     }
 
     private static readonly (string Name, uint Rgb)[] TintChoices =
     {
-        ("白色", 0xFFFFFF), ("暖白", 0xFFE6C8), ("冷蓝", 0xD3E6FF), ("玫瑰", 0xFFD0DC), ("薄荷", 0xCCF4E0), ("石墨", 0x2E3138),
+        ("White", 0xFFFFFF), ("Warm white", 0xFFE6C8), ("Cool blue", 0xD3E6FF), ("Rose", 0xFFD0DC), ("Mint", 0xCCF4E0), ("Graphite", 0x2E3138),
     };
 
     private void BuildTintSwatches()
@@ -387,7 +388,7 @@ public sealed partial class MainWindow : Window
                 Content = new Grid { Width = 28, Height = 28, Children = { dot, ring } },
                 Style = (Style)Application.Current.Resources["IconButtonStyle"], Width = 32, Height = 32, CornerRadius = new CornerRadius(16),
             };
-            AutomationProperties.SetName(button, Loc.F("染色 {0}", Loc.T(name)));
+            AutomationProperties.SetName(button, Loc.F("Tint {0}", Loc.T(name)));
             ToolTipService.SetToolTip(button, Loc.T(name));
             var captured = rgb;
             button.Click += (_, _) => SetTint(captured);
@@ -425,8 +426,8 @@ public sealed partial class MainWindow : Window
 
     private void ShowInstallAction()
     {
-        InstallRelease.Content = _preparedRelease != null ? Loc.T("重启并完成更新")
-            : _transferStatus is { CanRetry: false } || _queueingDownload ? Loc.T("后台下载中") : Loc.T("重试下载");
+        InstallRelease.Content = _preparedRelease != null ? Loc.T("Restart and finish update")
+            : _transferStatus is { CanRetry: false } || _queueingDownload ? Loc.T("Downloading in background") : Loc.T("Retry download");
         InstallRelease.IsEnabled = _updateCheck == null && !_queueingDownload
             && (_preparedRelease != null || _transferStatus?.CanRetry != false);
         InstallRelease.Visibility = _preparedRelease != null || _transferStatus != null || _latestRelease?.Download != null
@@ -457,7 +458,7 @@ public sealed partial class MainWindow : Window
             _transferStatus = state.Transfer;
             if (_preparedRelease != null)
             {
-                UpdateStatus.Text = Loc.T("更新已准备好，重启后生效");
+                UpdateStatus.Text = Loc.T("Update ready; restart to install");
                 UpdateAvailableButton.Visibility = ReleaseLinks.Visibility = Visibility.Visible;
                 ReleaseNotes.NavigateUri ??= new Uri("https://github.com/wynter-yaxley/atrium-desktop/releases/latest");
                 _downloadTimer?.Stop();
@@ -475,7 +476,7 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or COMException or JsonException)
         {
-            if (!_updatesClosed) UpdateStatus.Text = Loc.F("无法读取下载进度：{0}", error.Message);
+            if (!_updatesClosed) UpdateStatus.Text = Loc.F("Could not read download progress: {0}", error.Message);
             _downloadTimer?.Stop();
         }
         finally { _downloadRefreshBusy = false; }
@@ -493,11 +494,11 @@ public sealed partial class MainWindow : Window
             await worker.WaitForExitAsync(); // closing this window never cancels the transfer
             if (_updatesClosed) return;
             await RefreshDownloadAsync();
-            if (worker.ExitCode != 0 && _transferStatus == null) UpdateStatus.Text = Loc.T("无法开始后台下载，请重试");
+            if (worker.ExitCode != 0 && _transferStatus == null) UpdateStatus.Text = Loc.T("Could not start the background download. Try again.");
         }
         catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception)
         {
-            if (!_updatesClosed) UpdateStatus.Text = Loc.F("无法开始后台下载：{0}", error.Message);
+            if (!_updatesClosed) UpdateStatus.Text = Loc.F("Could not start the background download: {0}", error.Message);
         }
         finally
         {
@@ -532,7 +533,7 @@ public sealed partial class MainWindow : Window
         UpdateProgress.Visibility = Visibility.Visible;
         UpdateProgress.IsActive = true;
         ReleaseLinks.Visibility = Visibility.Collapsed;
-        UpdateStatus.Text = Loc.T("正在检查…");
+        UpdateStatus.Text = Loc.T("Checking…");
         try
         {
             string? installFailure = ReleaseInstaller.ReadFailure();
@@ -541,7 +542,7 @@ public sealed partial class MainWindow : Window
             if (_preparedRelease != null)
             {
                 UpdateAvailableButton.Visibility = ReleaseLinks.Visibility = Visibility.Visible;
-                UpdateStatus.Text = installFailure == null ? Loc.T("更新已准备好，重启后生效") : Loc.F("更新未安装：{0}", installFailure);
+                UpdateStatus.Text = installFailure == null ? Loc.T("Update ready; restart to install") : Loc.F("Update not installed: {0}", installFailure);
                 ReleaseNotes.NavigateUri = new Uri("https://github.com/wynter-yaxley/atrium-desktop/releases/latest");
                 ShowInstallAction();
                 return;
@@ -552,14 +553,14 @@ public sealed partial class MainWindow : Window
             if (release == null)
             {
                 UpdateAvailableButton.Visibility = Visibility.Collapsed;
-                UpdateStatus.Text = Loc.T("暂无正式版本");
+                UpdateStatus.Text = Loc.T("No stable release yet");
                 return;
             }
             var current = typeof(MainWindow).Assembly.GetName().Version!;
             int comparison = release.Version.CompareTo(current);
             UpdateAvailableButton.Visibility = comparison > 0 ? Visibility.Visible : Visibility.Collapsed;
-            UpdateStatus.Text = comparison > 0 ? Loc.F("有可用更新 {0}", release.Tag)
-                : comparison == 0 ? Loc.T("已是最新版本") : Loc.F("当前版本高于最新正式版 {0}", release.Tag);
+            UpdateStatus.Text = comparison > 0 ? Loc.F("Update available: {0}", release.Tag)
+                : comparison == 0 ? Loc.T("You're up to date") : Loc.F("This version is newer than the latest stable release {0}", release.Tag);
             ReleaseNotes.NavigateUri = release.Page;
             _latestRelease = release;
             ShowInstallAction();
@@ -573,12 +574,12 @@ public sealed partial class MainWindow : Window
             if (cancel.IsCancellationRequested) return; // the window closed while checking
             UpdateStatus.Text = _transferStatus?.Text ?? (error switch
             {
-                OperationCanceledException => Loc.T("连接超时，请重试"),
+                OperationCanceledException => Loc.T("Connection timed out. Try again."),
                 HttpRequestException { StatusCode: HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests }
-                    => Loc.T("GitHub 暂时无法响应，请稍后重试"),
-                HttpRequestException => Loc.T("无法连接 GitHub，请重试"),
-                IOException or UnauthorizedAccessException => Loc.F("无法准备更新：{0}", error.Message),
-                _ => Loc.T("无法读取版本信息，请稍后重试"),
+                    => Loc.T("GitHub is not responding. Try again later."),
+                HttpRequestException => Loc.T("Could not connect to GitHub. Try again."),
+                IOException or UnauthorizedAccessException => Loc.F("Could not prepare the update: {0}", error.Message),
+                _ => Loc.T("Could not read release information. Try again later."),
             });
         }
         finally
@@ -669,8 +670,8 @@ public sealed partial class MainWindow : Window
         CoreSwitch.IsOn = connected || (_coreProcess != null && !_coreProcess.HasExited);
         _updatingCoreSwitch = false;
         CoreSwitch.IsEnabled = !_coreChanging && CoreClient.CoreExe() != null;
-        if (!_coreChanging) StatusMessage.Text = connected ? Loc.T("正在运行") : _client.ConnectionError ??
-            (_coreProcess != null && !_coreProcess.HasExited ? Loc.T("核心进程仍在运行，设置连接已断开") : Loc.T("已关闭，系统任务栏已恢复"));
+        if (!_coreChanging) StatusMessage.Text = connected ? Loc.T("Running") : _client.ConnectionError ??
+            (_coreProcess != null && !_coreProcess.HasExited ? Loc.T("The core is still running; the settings connection closed") : Loc.T("Closed; Windows' taskbar is back"));
     }
 
     private void ShowMessage(InfoBarSeverity severity, string title, string message)
@@ -712,15 +713,15 @@ public sealed partial class MainWindow : Window
         bool start = CoreSwitch.IsOn;
         _coreChanging = true;
         CoreSwitch.IsEnabled = false;
-        StatusMessage.Text = start ? Loc.T("正在启动…") : Loc.T("正在关闭…");
+        StatusMessage.Text = start ? Loc.T("Starting…") : Loc.T("Closing…");
         Status.IsOpen = false;
         try
         {
-            var exe = CoreClient.CoreExe() ?? throw new FileNotFoundException(Loc.T("没有找到 Atrium.exe"));
+            var exe = CoreClient.CoreExe() ?? throw new FileNotFoundException(Loc.T("Atrium.exe was not found"));
             if (start)
             {
                 using var launched = Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
-                if (!await _client.ConnectAsync(8000)) throw new TimeoutException(Loc.T("未能连接 Atrium，请稍后重试。"));
+                if (!await _client.ConnectAsync(8000)) throw new TimeoutException(Loc.T("Could not connect to Atrium. Try again later."));
                 bool dirty = !_current.SameAs(_saved);
                 var (saved, current) = await _client.GetAsync();
                 _saved = saved;
@@ -734,15 +735,15 @@ public sealed partial class MainWindow : Window
                 _client.Disconnect();
                 WatchCore();
                 using var quit = Process.Start(new ProcessStartInfo(exe, "--exit") { UseShellExecute = false, CreateNoWindow = true })
-                    ?? throw new InvalidOperationException(Loc.T("未能发送退出请求。"));
+                    ?? throw new InvalidOperationException(Loc.T("Could not send the quit request."));
                 await quit.WaitForExitAsync();
-                if (quit.ExitCode != 0) throw new InvalidOperationException(Loc.T("Atrium 尚未退出，请稍后重试。"));
+                if (quit.ExitCode != 0) throw new InvalidOperationException(Loc.T("Atrium has not quit yet. Try again later."));
                 _client.Disconnect(coreStopped: true);
             }
         }
         catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException or TimeoutException or IOException)
         {
-            ShowMessage(InfoBarSeverity.Error, start ? Loc.T("启动失败") : Loc.T("关闭失败"), error.Message);
+            ShowMessage(InfoBarSeverity.Error, start ? Loc.T("Could not start") : Loc.T("Could not close"), error.Message);
         }
         finally
         {
@@ -843,7 +844,11 @@ public sealed partial class MainWindow : Window
         (_current.StatusStyle == "icons" ? StatusIcons : StatusRing).IsChecked = true;
         (_current.AutoHide switch { "never" => HideNever, "always" => HideAlways, _ => HideFullscreen }).IsChecked = true;
         StartupSwitch.IsOn = _current.StartOnLogin;
-        LanguagePicker.SelectedIndex = _current.Language switch { "zh" => 1, "en" => 2, _ => 0 };
+        string currentLanguage = _current.Language == "zh" ? "zh-Hans" : _current.Language;
+        LanguagePicker.SelectedIndex = 0;
+        for (int i = 0; i < LanguagePicker.Items.Count; i++)
+            if (LanguagePicker.Items[i] is ComboBoxItem item && (item.Tag as string) == currentLanguage)
+                LanguagePicker.SelectedIndex = i;
         LoadDisplayControls();
         (_current.TextColor switch { "light" => TextLight, "dark" => TextDark, _ => TextAuto }).IsChecked = true;
         UpdateGallery();
@@ -1124,6 +1129,19 @@ public sealed partial class MainWindow : Window
         if (sender is DependencyObject root) Loc.Localize(root);
     }
 
+    // The picker follows locales/manifest.json: adding a language file and a
+    // manifest entry is enough; no code change here.
+    private void PopulateLanguagePicker()
+    {
+        bool loading = _loading;
+        _loading = true;
+        LanguagePicker.Items.Clear();
+        LanguagePicker.Items.Add(new ComboBoxItem { Content = Loc.T("Follow system"), Tag = "auto" });
+        foreach (var (tag, name) in Loc.Languages)
+            LanguagePicker.Items.Add(new ComboBoxItem { Content = name, Tag = tag });
+        _loading = loading;
+    }
+
     private void OnLanguageChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_loading) return;
@@ -1234,7 +1252,7 @@ public sealed partial class MainWindow : Window
         SaveButton.IsEnabled = dirty;
         RevertButton.IsEnabled = dirty;
         _flashId++;
-        DirtyText.Text = Loc.T("未保存");
+        DirtyText.Text = Loc.T("Unsaved");
         DirtyDot.Fill = new SolidColorBrush(Color.FromArgb(255, 0xFF, 0x9F, 0x0A));
         RevertButton.Visibility = SaveButton.Visibility = Visibility.Visible;
         ShowSaveBar(dirty);
@@ -1250,7 +1268,7 @@ public sealed partial class MainWindow : Window
     private async void FlashSaved()
     {
         int id = ++_flashId;
-        DirtyText.Text = Loc.T("已保存");
+        DirtyText.Text = Loc.T("Saved");
         DirtyDot.Fill = new SolidColorBrush(Color.FromArgb(255, 0x30, 0xD1, 0x58));
         RevertButton.Visibility = SaveButton.Visibility = Visibility.Collapsed;
         ShowSaveBar(true);
@@ -1290,7 +1308,7 @@ public sealed partial class MainWindow : Window
         if (_updatesClosed) return false;
         if (error != null)
         {
-            ShowMessage(InfoBarSeverity.Error, Loc.T("保存失败"), error);
+            ShowMessage(InfoBarSeverity.Error, Loc.T("Could not save"), error);
             return false;
         }
         _saved = sent;
@@ -1305,7 +1323,7 @@ public sealed partial class MainWindow : Window
         Status.IsOpen = false;
         UpdateButtons();
         if (_client.LastSaveWarning is { } warning)
-            ShowMessage(InfoBarSeverity.Warning, Loc.T("设置已保存"), warning);
+            ShowMessage(InfoBarSeverity.Warning, Loc.T("Settings saved"), warning);
         else if (_current.SameAs(_saved)) FlashSaved(); // edits made meanwhile keep the capsule as it is
         ShowStatus(_client.Connected);
         return true;
@@ -1369,11 +1387,11 @@ public sealed partial class MainWindow : Window
                 {
                     Style = (Style)Application.Current.Resources["AtriumDialogStyle"],
                     XamlRoot = Content.XamlRoot,
-                    Title = Loc.T("保存修改？"),
-                    Content = Loc.T("未保存的修改在关闭后会被撤销。"),
-                    PrimaryButtonText = Loc.T("保存"),
-                    SecondaryButtonText = Loc.T("不保存"),
-                    CloseButtonText = Loc.T("取消"),
+                    Title = Loc.T("Save changes?"),
+                    Content = Loc.T("Unsaved changes will be discarded when this window closes."),
+                    PrimaryButtonText = Loc.T("Save"),
+                    SecondaryButtonText = Loc.T("Don't save"),
+                    CloseButtonText = Loc.T("Cancel"),
                     DefaultButton = ContentDialogButton.Primary,
                 };
                 var result = await dialog.ShowAsync();
@@ -1386,7 +1404,7 @@ public sealed partial class MainWindow : Window
                 catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
                 {
                     _restartUpdate = null;
-                    UpdateStatus.Text = error is UnauthorizedAccessException ? Loc.T("安装目录不可写，更新未安装") : Loc.F("无法重启更新：{0}", error.Message);
+                    UpdateStatus.Text = error is UnauthorizedAccessException ? Loc.T("The installation folder is not writable; the update was not installed") : Loc.F("Could not restart for the update: {0}", error.Message);
                     return;
                 }
             }

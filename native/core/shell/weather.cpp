@@ -251,35 +251,35 @@ bool FromJson(const json::JsonObject& o, Weather& w)
 std::wstring WeatherCondition(int code)
 {
     switch (code) {
-    case 0: return Tr(L"晴");
-    case 1: return Tr(L"大部晴朗");
-    case 2: return Tr(L"局部多云");
-    case 3: return Tr(L"阴");
+    case 0: return Tr(L"Clear");
+    case 1: return Tr(L"Mostly clear");
+    case 2: return Tr(L"Partly cloudy");
+    case 3: return Tr(L"Overcast");
     case 45:
-    case 48: return Tr(L"雾");
+    case 48: return Tr(L"Fog");
     case 51:
     case 53:
-    case 55: return Tr(L"毛毛雨");
+    case 55: return Tr(L"Drizzle");
     case 56:
     case 57:
     case 66:
-    case 67: return Tr(L"冻雨");
-    case 61: return Tr(L"小雨");
-    case 63: return Tr(L"中雨");
-    case 65: return Tr(L"大雨");
-    case 71: return Tr(L"小雪");
-    case 73: return Tr(L"中雪");
-    case 75: return Tr(L"大雪");
-    case 77: return Tr(L"雪粒");
+    case 67: return Tr(L"Freezing rain");
+    case 61: return Tr(L"Light rain");
+    case 63: return Tr(L"Moderate rain");
+    case 65: return Tr(L"Heavy rain");
+    case 71: return Tr(L"Light snow");
+    case 73: return Tr(L"Moderate snow");
+    case 75: return Tr(L"Heavy snow");
+    case 77: return Tr(L"Snow grains");
     case 80:
-    case 81: return Tr(L"阵雨");
-    case 82: return Tr(L"强阵雨");
+    case 81: return Tr(L"Rain showers");
+    case 82: return Tr(L"Violent rain showers");
     case 85:
-    case 86: return Tr(L"阵雪");
-    case 95: return Tr(L"雷阵雨");
+    case 86: return Tr(L"Snow showers");
+    case 95: return Tr(L"Thunderstorm");
     case 96:
-    case 99: return Tr(L"雷阵雨伴冰雹");
-    default: return Tr(L"多云");
+    case 99: return Tr(L"Thunderstorm with hail");
+    default: return Tr(L"Cloudy");
     }
 }
 
@@ -371,7 +371,7 @@ bool WeatherSource::Fetch()
     if (!Locate(lat, lon, city)) {
         std::lock_guard g(lock_);
         latest_.ok = latest_.ok && !latest_.hours.empty();
-        latest_.error = Tr(L"无法确定位置");
+        latest_.error = Tr(L"Location unavailable");
         Log(L"weather: no location");
         return false;
     }
@@ -384,7 +384,7 @@ bool WeatherSource::Fetch()
                lat, lon);
     if (!Parse(GetAny(url), o) || !o.HasKey(L"current") || !o.HasKey(L"hourly") || !o.HasKey(L"daily")) {
         std::lock_guard g(lock_);
-        latest_.error = Tr(L"无法获取天气");
+        latest_.error = Tr(L"Weather unavailable");
         Log(L"weather: no forecast for %s", city.c_str());
         return false;
     }
@@ -411,7 +411,7 @@ bool WeatherSource::Fetch()
         if (at + 60 <= now)
             continue;
         WeatherHour x;
-        x.label = items.empty() ? std::wstring(Tr(L"现在")) : LanguageIsEnglish() ? std::to_wstring(h) + L":00" : std::to_wstring(h) + L"时";
+        x.label = items.empty() ? std::wstring(Tr(L"Now")) : LanguageIsEnglish() ? std::to_wstring(h) + L":00" : std::to_wstring(h) + L"时";
         x.temp = float(temps.GetNumberAt(i));
         x.code = int(codes.GetNumberAt(i));
         x.day = days.GetNumberAt(i) != 0;
@@ -448,7 +448,7 @@ bool WeatherSource::Fetch()
         int wd = 0;
         Minutes(std::wstring(dates.GetStringAt(i)) + L"T00:00", nullptr, nullptr, &wd);
         WeatherDay d;
-        d.label = i == 0 ? Tr(L"今天") : WeekName(wd);
+        d.label = i == 0 ? Tr(L"Today") : WeekName(wd);
         d.code = int(dcodes.GetNumberAt(i));
         d.hi = float(his.GetNumberAt(i));
         d.lo = float(los.GetNumberAt(i));

@@ -161,7 +161,7 @@ void CalendarPanel::PaintMonth(Canvas& c, const Theme& t, D2D1_RECT_F card)
     bool away = year_ != now.wYear || month_ != now.wMonth || selected_.wYear != now.wYear || selected_.wMonth != now.wMonth ||
                 selected_.wDay != now.wDay;
     if (away) {
-        std::wstring label = Tr(L"今天");
+        std::wstring label = Tr(L"Today");
         float bw = c.TextWidth(label, 12.5f) + 26;
         button(L"today", D2D1::RectF(prev.left - 8 - bw, by - 15, prev.left - 8, by + 15), L"", label);
     }
@@ -216,7 +216,7 @@ void CalendarPanel::PaintMonth(Canvas& c, const Theme& t, D2D1_RECT_F card)
     // The system's settings.
     float fy = gridTop + 6 * kCellH + 8;
     c.Line(kPad + 8, fy, w - kPad - 8, fy, t.divider);
-    const std::wstring settingsLabel = Tr(L"日期和时间设置");
+    const std::wstring settingsLabel = Tr(L"Date & time settings");
     D2D1_RECT_F link = D2D1::RectF(kPad, fy + 5, kPad + c.TextWidth(settingsLabel, 12.5f) + 28, fy + kFooter - 5);
     float lh = Hover(c, L"settings", hover_ == L"settings");
     if (lh > 0.001f)

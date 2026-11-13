@@ -41,7 +41,7 @@ void CheckSettings()
     settings.language = L"en";
     Require(Settings::FromJson(settings.ToJson(), Settings{}, parsed) && parsed.language == L"en", "the interface language survives saving");
     Require(Settings::FromJson(LR"({})", Settings{}, parsed) && parsed.language == L"auto", "old settings follow the system language");
-    Require(Settings::FromJson(LR"({"language":"bad"})", Settings{}, parsed) && parsed.language == L"auto",
+    Require(Settings::FromJson(LR"({"language":"bad tag"})", Settings{}, parsed) && parsed.language == L"auto",
         "an unknown language follows the system");
     Require(Settings::FromJson(settings.ToJson(), Settings{}, parsed), "restore settings round trip");
     Require(parsed.dockDisplayMode == L"all" && parsed.dockDisplayDelay == 750 && parsed.dockDisplay == settings.dockDisplay &&

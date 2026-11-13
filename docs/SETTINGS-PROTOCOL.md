@@ -32,7 +32,7 @@
 | `showStatus` | bool | | true | 状态环与控制中心入口 |
 | `showNotifications` | bool | | true | 通知入口；关闭入口不关闭通知来源 |
 | `textColor` | string | `auto` / `light` / `dark` | `auto` | 文字颜色；`auto` 按玻璃下方的实际亮度选择 |
-| `language` | string | `auto` / `zh` / `en` | `auto` | 界面语言：`auto` 跟随 Windows 的显示语言（中文 → 简体中文，其余 → English）；`zh` 简体中文；`en` English。任务栏、开始菜单、控制中心、通知、桌面小组件与设置中心一起切换，保存后立即生效 |
+| `language` | string | `auto` / `zh-Hans` / `en` / locale tag | `auto` | 界面语言：`auto` 跟随 Windows 的显示语言（中文 → 简体中文，其余 → English）；`zh-Hans` 简体中文；`en` English；其他值对应 `locales/<tag>.json`。旧配置的 `zh` 视为 `zh-Hans`。任务栏、开始菜单、控制中心、通知、桌面小组件与设置中心一起切换，保存后立即生效 |
 | `autoHide` | string | `never` / `fullscreen` / `always` | `fullscreen` | 栏的显示方式：常驻；全屏时隐藏（有最大化、全屏或分屏铺满屏幕的窗口时滑出屏幕，前面再开小窗口也不出来）；一直隐藏。隐藏时，指针移到栏下方的屏幕底边栏就出现，离开后收回 |
 | `statusStyle` | string | `ring` / `icons` | `ring` | 状态栏的样子：Wi-Fi 外面一圈电量或音量的圆环；或者像 Windows 任务栏那样并排的网络、音量、电池三个图标（自绘，跟随字色）。点按都打开控制中心 |
 | `iconSize` | number | 16–64 DIP | 30 | 任务栏图标边长 |

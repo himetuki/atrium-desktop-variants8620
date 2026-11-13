@@ -53,7 +53,7 @@ inline std::wstring JoinNames(const std::vector<std::wstring>& names)
     std::wstring joined;
     for (const auto& name : names) {
         if (!joined.empty())
-            joined += Tr(L"、");
+            joined += Tr(L", ");
         joined += name;
     }
     return joined;

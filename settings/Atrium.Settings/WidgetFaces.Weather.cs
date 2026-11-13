@@ -42,17 +42,17 @@ internal static partial class WidgetFaces
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidOperationException or FormatException) { }
-        return new WeatherData(Loc.T("南京"), 18, 21, 12, 2, true,
-            new WeatherHour[] { new(Loc.T("现在"), 2, true, 18, 0), new(Loc.T("15时"), 1, true, 19, 0), new(Loc.T("16时"), 1, true, 19, 0), new("17:12", 0, true, 0, 2),
-                                new(Loc.T("18时"), 1, false, 16, 0), new(Loc.T("19时"), 0, false, 15, 0) },
-            new WeatherDay[] { new(Loc.T("今天"), 2, 12, 21), new(Loc.T("周二"), 61, 11, 17), new(Loc.T("周三"), 3, 9, 15), new(Loc.T("周四"), 0, 8, 18), new(Loc.T("周五"), 1, 10, 20) });
+        return new WeatherData(Loc.T("Nanjing"), 18, 21, 12, 2, true,
+            new WeatherHour[] { new(Loc.T("Now"), 2, true, 18, 0), new(Loc.T("15:00"), 1, true, 19, 0), new(Loc.T("16:00"), 1, true, 19, 0), new("17:12", 0, true, 0, 2),
+                                new(Loc.T("18:00"), 1, false, 16, 0), new(Loc.T("19:00"), 0, false, 15, 0) },
+            new WeatherDay[] { new(Loc.T("Today"), 2, 12, 21), new(Loc.T("Tue"), 61, 11, 17), new(Loc.T("Wed"), 3, 9, 15), new(Loc.T("Thu"), 0, 8, 18), new(Loc.T("Fri"), 1, 10, 20) });
     }
 
     private static string Condition(int code) => code switch
     {
-        0 => Loc.T("晴"), 1 => Loc.T("大部晴朗"), 2 => Loc.T("局部多云"), 3 => Loc.T("阴"), 45 or 48 => Loc.T("雾"), 51 or 53 or 55 => Loc.T("毛毛雨"), 56 or 57 or 66 or 67 => Loc.T("冻雨"),
-        61 => Loc.T("小雨"), 63 => Loc.T("中雨"), 65 => Loc.T("大雨"), 71 => Loc.T("小雪"), 73 => Loc.T("中雪"), 75 => Loc.T("大雪"), 77 => Loc.T("雪粒"), 80 or 81 => Loc.T("阵雨"), 82 => Loc.T("强阵雨"),
-        85 or 86 => Loc.T("阵雪"), 95 => Loc.T("雷阵雨"), 96 or 99 => Loc.T("雷阵雨伴冰雹"), _ => Loc.T("多云"),
+        0 => Loc.T("Clear"), 1 => Loc.T("Mostly clear"), 2 => Loc.T("Partly cloudy"), 3 => Loc.T("Overcast"), 45 or 48 => Loc.T("Fog"), 51 or 53 or 55 => Loc.T("Drizzle"), 56 or 57 or 66 or 67 => Loc.T("Freezing rain"),
+        61 => Loc.T("Light rain"), 63 => Loc.T("Moderate rain"), 65 => Loc.T("Heavy rain"), 71 => Loc.T("Light snow"), 73 => Loc.T("Moderate snow"), 75 => Loc.T("Heavy snow"), 77 => Loc.T("Snow grains"), 80 or 81 => Loc.T("Rain showers"), 82 => Loc.T("Violent rain showers"),
+        85 or 86 => Loc.T("Snow showers"), 95 => Loc.T("Thunderstorm"), 96 or 99 => Loc.T("Thunderstorm with hail"), _ => Loc.T("Cloudy"),
     };
 
     private enum Sky { Clear, Partly, Cloudy, Fog, Rain, Snow, Storm }
@@ -91,7 +91,7 @@ internal static partial class WidgetFaces
         const double pad = 16;
         Text(c, d.City, pad, 12, w - pad - (size == "small" ? 0 : 120), 32, 14.5, text, 2, 0, p);
         Text(c, Deg(d.Temp), pad - 2, 30, w / 2 + 40, 82, 44, text, 0, 0, p);
-        string range = Loc.F("最高 {0}  最低 {1}", Deg(d.Hi), Deg(d.Lo));
+        string range = Loc.F("H {0}  L {1}", Deg(d.Hi), Deg(d.Lo));
         if (size == "small")
         {
             Icon(c, d.Code, d.Day, pad + 11, h - 62, 22, 0, ink);
@@ -110,7 +110,7 @@ internal static partial class WidgetFaces
             double x0 = pad + colW * i, cx = x0 + colW / 2;
             Text(c, hr.Label, x0 - 4, hy, x0 + colW + 4, hy + 16, 11.5, sub, 2, 1, p);
             Icon(c, hr.Code, hr.Day, cx, hy + 31, 22, hr.Event, ink);
-            Text(c, hr.Event != 0 ? (hr.Event == 1 ? Loc.T("日出") : Loc.T("日落")) : Deg(hr.Temp), x0 - 4, hy + 46, x0 + colW + 4, hy + 64, hr.Event != 0 ? 12 : 13.5, text, 2, 1, p);
+            Text(c, hr.Event != 0 ? (hr.Event == 1 ? Loc.T("Sunrise") : Loc.T("Sunset")) : Deg(hr.Temp), x0 - 4, hy + 46, x0 + colW + 4, hy + 64, hr.Event != 0 ? 12 : 13.5, text, 2, 1, p);
         }
         if (size != "large") return;
         double top2 = hy + 76;

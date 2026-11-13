@@ -654,7 +654,7 @@ std::shared_ptr<const JumpListData> LoadJumpList(const std::wstring& appId, cons
             out.title = category.title;
             out.items = std::move(category.items);
             if (category.type == 1) {
-                out.title = category.known == 1 ? L"常用" : L"最近";
+                out.title = category.known == 1 ? L"Frequent" : L"Recent";
                 recentCovered = true;
                 // A known category is not stored in the file: its rows are the automatic list.
                 if (out.items.empty())
@@ -670,7 +670,7 @@ std::shared_ptr<const JumpListData> LoadJumpList(const std::wstring& appId, cons
             data->categories.push_back(std::move(category));
         for (JumpCategory& category : tasks) {
             if (category.title.empty())
-                category.title = L"任务";
+                category.title = L"Tasks";
             data->categories.push_back(std::move(category));
         }
     }

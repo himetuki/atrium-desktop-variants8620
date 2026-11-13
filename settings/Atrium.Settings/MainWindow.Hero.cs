@@ -131,8 +131,8 @@ public sealed partial class MainWindow
     private void OnEngage(string title, bool on)
     {
         _engaged = on ? title : (_engaged == title ? null : _engaged);
-        bool edge = _engaged == Loc.T("折射强度") || _engaged == Loc.T("折射边缘宽度") || _engaged == Loc.T("色散") ||
-                    _engaged == Loc.T("高光") || _engaged == Loc.T("圆角") || _engaged == Loc.T("阴影");
+        bool edge = _engaged == Loc.T("Refraction") || _engaged == Loc.T("Refraction edge") || _engaged == Loc.T("Dispersion") ||
+                    _engaged == Loc.T("Highlight") || _engaged == Loc.T("Corner radius") || _engaged == Loc.T("Shadow");
         Loupe.BorderBrush = edge ? Tokens.Brush("AccentBrush") : new SolidColorBrush(Color.FromArgb(179, 255, 255, 255));
         UpdateHero();
     }
@@ -280,39 +280,39 @@ public sealed partial class MainWindow
         }
 
         double barBottom = L.BarY + L.BarH, barRight = L.BarX + L.BarW;
-        if (_engaged == Loc.T("高度"))
+        if (_engaged == Loc.T("Height"))
         {
             double x = L.BarX - 14;
             Line(x, L.BarY, x, barBottom); Line(x - 4, L.BarY, x + 4, L.BarY); Line(x - 4, barBottom, x + 4, barBottom);
             Chip($"{Math.Round(_current.Height)} px", x - 30, L.BarY + L.BarH / 2 - 10);
         }
-        else if (_engaged == Loc.T("底部间距"))
+        else if (_engaged == Loc.T("Bottom spacing"))
         {
             double x = L.BarX + L.BarW * 0.5;
             Line(x, barBottom, x, _heroH); Line(x - 4, barBottom, x + 4, barBottom); Line(x - 4, _heroH - 1, x + 4, _heroH - 1);
             Chip($"{Math.Round(_current.Margin)} px", x + 34, (barBottom + _heroH) / 2 - 10);
         }
-        else if (_engaged == Loc.T("最大宽度"))
+        else if (_engaged == Loc.T("Maximum width"))
         {
             double y = L.BarY - 12, x0 = (_heroW - L.MaxW) / 2, x1 = x0 + L.MaxW;
             Line(x0, y, x1, y, dashed: true); Line(x0, y - 4, x0, y + 4); Line(x1, y - 4, x1, y + 4);
             Chip($"{Math.Round(_current.Width)} px", _heroW / 2, y - 24);
         }
-        else if (_engaged == Loc.T("进入距离") || _engaged == Loc.T("离开距离"))
+        else if (_engaged == Loc.T("Enter distance") || _engaged == Loc.T("Leave distance"))
         {
             // The band above the bar that answers a pointer coming down onto it (栏上方提前拱起 /
             // 提前放大图标): a dashed line at the enter distance, and the leave one while it is set.
             double x0 = L.BarX + 8, x1 = Math.Max(x0 + 1, barRight - 8);
             double enterY = L.BarY - _current.NearEnter * L.S, leaveY = L.BarY - _current.NearLeave * L.S;
             Line(x0, enterY, x1, enterY, dashed: true);
-            Chip(Loc.F("进入 {0} px", Math.Round(_current.NearEnter)), x0 + 44, enterY - 22);
-            if (_engaged == Loc.T("离开距离"))
+            Chip(Loc.F("Enter {0} px", Math.Round(_current.NearEnter)), x0 + 44, enterY - 22);
+            if (_engaged == Loc.T("Leave distance"))
             {
                 Line(x0, leaveY, x1, leaveY, dashed: true);
-                Chip(Loc.F("离开 {0} px", Math.Round(_current.NearLeave)), x0 + 44, leaveY - 22);
+                Chip(Loc.F("Leave {0} px", Math.Round(_current.NearLeave)), x0 + 44, leaveY - 22);
             }
         }
-        else if (_engaged == Loc.T("圆角"))
+        else if (_engaged == Loc.T("Corner radius"))
         {
             // The circle the corner is an arc of, and its radius.
             double r = Math.Max(L.Radius, 2);
@@ -324,7 +324,7 @@ public sealed partial class MainWindow
             Line(L.BarX + r, L.BarY + r, L.BarX + r - r * 0.7071, L.BarY + r - r * 0.7071);
             Chip($"R {Math.Round(Math.Min(_current.CornerRadius, _current.Height / 2))} px", L.BarX + r, L.BarY - 30);
         }
-        else if (_engaged == Loc.T("图标大小"))
+        else if (_engaged == Loc.T("Icon size"))
         {
             if (L.N == 0) return;
             double x = L.PlateX(0) + L.P / 2 - L.Icon / 2 - 4, y0 = L.PlateY + L.P / 2 - L.Icon / 2, y1 = y0 + L.Icon;

@@ -10,7 +10,7 @@ public sealed partial class MainWindow
 
     private void InitDisplays()
     {
-        DisplayDelay.Configure(Loc.T("跨屏停留时间"), 100, 2000, 50, "ms");
+        DisplayDelay.Configure(Loc.T("Cross-display dwell time"), 100, 2000, 50, "ms");
         DisplayDelay.UserValueChanged += value =>
         {
             if (_loading) return;
@@ -26,20 +26,20 @@ public sealed partial class MainWindow
         _loading = true;
         _displays = DesktopDisplay.Read();
         ConnectedDisplayList.ItemsSource = _displays;
-        DisplaySummary.Text = Loc.F("已连接 {0} 台显示器", _displays.Count);
-        var choices = new List<DesktopDisplay> { new("", Loc.T("跟随系统主显示器"), "", true) };
+        DisplaySummary.Text = Loc.F("{0} display(s) connected", _displays.Count);
+        var choices = new List<DesktopDisplay> { new("", Loc.T("Follow the system primary display"), "", true) };
         choices.AddRange(_displays);
         // Keep an unplugged selection visible; reconnection restores it without resaving.
         foreach (string id in new[] { _current.DockDisplay, _current.DesktopDisplay }.Distinct())
             if (id.Length > 0 && !choices.Any(d => d.Id == id))
-                choices.Add(new(id, Loc.T("未连接的显示器（暂用主屏，重连后恢复）"), "", false));
+                choices.Add(new(id, Loc.T("Disconnected display (using the primary until it returns)"), "", false));
         DockDisplayPicker.ItemsSource = choices;
         DesktopDisplayPicker.ItemsSource = choices;
         DockDisplayPicker.SelectedItem = choices.First(d => d.Id == _current.DockDisplay);
         DesktopDisplayPicker.SelectedItem = choices.First(d => d.Id == _current.DesktopDisplay);
         DisplayFallback.Text = new[] { _current.DockDisplayMode == "fixed" ? _current.DockDisplay : "", _current.DesktopDisplay }
             .Any(id => id.Length > 0 && !_displays.Any(d => d.Id == id))
-            ? Loc.T("所选显示器已断开，当前使用主屏；重新连接后会自动恢复。") : "";
+            ? Loc.T("The chosen display is disconnected; the primary is used and the choice returns when it reconnects.") : "";
         DisplayFallback.Visibility = DisplayFallback.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         _loading = loading;
     }

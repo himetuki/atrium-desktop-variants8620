@@ -344,7 +344,7 @@ void StartMenu::LoadAccount()
     wchar_t privacy[8] = {};
     private_ = GetEnvironmentVariableW(L"ATRIUM_PRIVACY", privacy, 8) && privacy[0] == L'1';
     if (private_) {
-        userName_ = Tr(L"用户"); // 用户
+        userName_ = Tr(L"User"); // 用户
         return;
     }
     wchar_t buf[256] = {};
@@ -885,7 +885,7 @@ void StartMenu::PaintSearch(Canvas& c, const Theme& t)
     c.Glyph(L"\uE721", D2D1::RectF(search.left + 10, search.top, search.left + 44, search.bottom), 16, t.subtext);
     D2D1_RECT_F field = D2D1::RectF(search.left + 46, search.top, search.right - 48, search.bottom);
     if (query_.empty())
-        c.Text(Tr(L"搜索应用和文件夹"), field, 15, t.faint);
+        c.Text(Tr(L"Search apps and folders"), field, 15, t.faint);
     else
         c.Text(query_, field, 15, t.text);
     if (!naming_) {
@@ -903,7 +903,7 @@ void StartMenu::PaintSearch(Canvas& c, const Theme& t)
 
     const D2D1_RECT_F b = AllButton();
     const bool back = allApps_ && query_.empty();
-    const std::wstring label = back ? Tr(L"返回") : Tr(L"全部应用");
+    const std::wstring label = back ? Tr(L"Back") : Tr(L"All apps");
     float hv = Hover(c, L"allapps", hover_ == L"allapps");
     c.Fill(b, r, Alpha(pressed_ == L"allapps" ? t.press : t.hover, 0.45f + 0.55f * hv));
     const float tw = c.TextWidth(label, 13), x = (b.left + b.right - (16 + 6 + tw)) / 2;
@@ -987,7 +987,7 @@ void StartMenu::PaintTiles(Canvas& c, const Theme& t, float shown)
     const double now = c.now;
     const std::vector<int> order = Order();
     if (order.empty()) {
-        std::wstring msg = catalog_.Loaded() ? Tr(L"还没有固定的应用。右键单击搜索结果或“全部应用”里的应用来固定") : Tr(L"正在读取…");
+        std::wstring msg = catalog_.Loaded() ? Tr(L"Nothing is pinned yet. Right-click an app in the search results or All apps to pin it.") : Tr(L"Reading…");
         c.Text(msg, D2D1::RectF(kSearchX, kGridTop + 60, w - kSearchX, kGridTop + 90), 13, Alpha(t.subtext, shown), DWRITE_FONT_WEIGHT_NORMAL, 1);
         return;
     }
@@ -1072,7 +1072,7 @@ void StartMenu::PaintRows(Canvas& c, const Theme& t, const std::vector<Row>& row
     scrollTarget_ = std::clamp(scrollTarget_, 0.f, std::max(0.f, contentH_ - viewH));
     scroll_ = std::clamp(scroll_, 0.f, std::max(0.f, contentH_ - viewH));
     if (rows.empty()) {
-        std::wstring msg = !query_.empty() ? Tr(L"没有找到应用") : catalog_.Loaded() ? Tr(L"没有应用") : Tr(L"正在读取…");
+        std::wstring msg = !query_.empty() ? Tr(L"No apps found") : catalog_.Loaded() ? Tr(L"No apps") : Tr(L"Reading…");
         c.Text(msg, D2D1::RectF(kSearchX, kGridTop + 60, w - kSearchX, kGridTop + 90), 13, Alpha(t.subtext, shown), DWRITE_FONT_WEIGHT_NORMAL, 1);
         return;
     }
@@ -1101,7 +1101,7 @@ void StartMenu::PaintRows(Canvas& c, const Theme& t, const std::vector<Row>& row
         c.BeginGroup(e * visible, 1, (r.left + r.right) / 2, (r.top + r.bottom) / 2, 0, 8 * (1 - e));
         if (row.letter) {
             // A letter's heading (or the hidden apps').
-            const std::wstring label = row.letter == kHiddenHead ? Tr(L"已隐藏") : std::wstring(1, row.letter);
+            const std::wstring label = row.letter == kHiddenHead ? Tr(L"Hidden") : std::wstring(1, row.letter);
             const float tw = std::max(c.TextWidth(label, 13, DWRITE_FONT_WEIGHT_SEMI_BOLD), 10.f);
             D2D1_RECT_F chip = D2D1::RectF(r.left + 6, r.top + 6, r.left + 6 + tw + 20, r.bottom - 4);
             c.Fill(chip, (chip.bottom - chip.top) / 2, Alpha(t.hover, 0.35f));
@@ -1136,7 +1136,7 @@ void StartMenu::PaintRows(Canvas& c, const Theme& t, const std::vector<Row>& row
                 DrawIcon(c, f.apps[k].id, px, D2D1::RectF(x, yy, x + m, yy + m), 3);
             }
             name = f.name;
-            note = TrFormat(L"%d 个应用", int(f.apps.size()));
+            note = TrFormat(L"%d apps", int(f.apps.size()));
         } else {
             DrawIcon(c, row.app.id, rowPx, ir, 7);
             name = row.app.name;
@@ -1144,7 +1144,7 @@ void StartMenu::PaintRows(Canvas& c, const Theme& t, const std::vector<Row>& row
         c.EndGroup();
         c.Text(name, D2D1::RectF(r.left + 56, r.top, r.right - 100, r.bottom), 14, t.text);
         if (selected && !query_.empty())
-            note = Tr(L"Enter 打开");
+            note = Tr(L"Enter to open");
         if (!note.empty())
             c.Text(note, D2D1::RectF(r.right - 110, r.top, r.right - 18, r.bottom), 12, t.faint, DWRITE_FONT_WEIGHT_NORMAL, 2);
         c.EndGroup();
@@ -1409,7 +1409,7 @@ void StartMenu::PaintShelf(Canvas& c, const Theme& t)
         button(L"network", !status_.connected ? L"\uEB55" : status_.wifi ? L"\uE701" : L"\uE839", L"", !status_.connected);
 
     // Account, in what is left.
-    std::wstring name = userName_.empty() ? Tr(L"用户") : userName_;
+    std::wstring name = userName_.empty() ? Tr(L"User") : userName_;
     const float left = shelf.left + edge;
     float nw = std::clamp(c.TextWidth(name, 14, DWRITE_FONT_WEIGHT_SEMI_BOLD), 0.f, std::max(0.f, x - left - 70));
     D2D1_RECT_F acct = D2D1::RectF(left, cy - bh / 2, left + 8 + 28 + 10 + nw + 16, cy + bh / 2);
@@ -1439,7 +1439,7 @@ void StartMenu::PaintPower(Canvas& c, const Theme& t)
         c.Continue();
     c.BeginGroup(motion::EaseOut(e * 1.3f), 0.92f + 0.08f * motion::EaseOutBack(e, 1.5f), card.right - 22, card.bottom);
     static const wchar_t* const kGlyphs[] = {L"\uE708", L"\uE72C", L"\uE7E8", L"\uE72E"};
-    const wchar_t* const kNames[] = {Tr(L"睡眠"), Tr(L"重启"), Tr(L"关机"), Tr(L"锁定")};
+    const wchar_t* const kNames[] = {Tr(L"Sleep"), Tr(L"Restart"), Tr(L"Shut down"), Tr(L"Lock")};
     for (int i = 0; i < 4; ++i) {
         D2D1_RECT_F row = D2D1::RectF(card.left + 8, card.top + kPowerPad + kPowerRowH * float(i), card.right - 8,
                                       card.top + kPowerPad + kPowerRowH * float(i + 1));
@@ -1781,7 +1781,7 @@ void StartMenu::EndDrag(bool commit)
             else if (target->Folder())
                 target->apps.push_back(std::move(*moved));
             else {
-                StartTile folder{layout_.NewFolderId(), Tr(L"新建文件夹"), {std::move(*target), std::move(*moved)}};
+                StartTile folder{layout_.NewFolderId(), Tr(L"New folder"), {std::move(*target), std::move(*moved)}};
                 made = folder.id;
                 *target = std::move(folder);
             }
@@ -1976,40 +1976,40 @@ void StartMenu::ContextMenu(const std::wstring& id, POINT screen)
             app = rows[i].app, isApp = true;
     }
     if (isApp) {
-        entries.push_back({Tr(L"打开"), kOpen});
+        entries.push_back({Tr(L"Open"), kOpen});
         // As in Windows' start menu, for desktop apps.
         if (!AppCatalog::FileLocation(app).empty()) {
-            entries.push_back({Tr(L"以管理员身份运行"), kAdmin});
-            entries.push_back({Tr(L"打开文件所在的位置"), kLocation});
+            entries.push_back({Tr(L"Run as administrator"), kAdmin});
+            entries.push_back({Tr(L"Open File Location"), kLocation});
         }
         entries.push_back({});
-        entries.push_back({Tr(L"固定到任务栏"), kPinBar});
+        entries.push_back({Tr(L"Pin to taskbar"), kPinBar});
         if (!OnStart(app.id))
-            entries.push_back({Tr(L"固定到开始菜单"), kPinStart});
+            entries.push_back({Tr(L"Pin to Start"), kPinStart});
         if (inFolder)
-            entries.push_back({Tr(L"移出文件夹"), kOutOfFolder});
+            entries.push_back({Tr(L"Remove from folder"), kOutOfFolder});
         if (OnStart(app.id))
-            entries.push_back({Tr(L"从开始菜单移除"), kRemove});
-        entries.push_back(Hidden(app.id) ? MenuEntry{Tr(L"取消隐藏"), kUnhide} : MenuEntry{Tr(L"隐藏"), kHide});
+            entries.push_back({Tr(L"Remove from Start"), kRemove});
+        entries.push_back(Hidden(app.id) ? MenuEntry{Tr(L"Unhide"), kUnhide} : MenuEntry{Tr(L"Hide"), kHide});
     } else if (!folderKey.empty()) {
-        entries = {{Tr(L"打开"), kOpen}, {Tr(L"重命名"), kRename}, {Tr(L"解散文件夹"), kUngroup}};
+        entries = {{Tr(L"Open"), kOpen}, {Tr(L"Rename"), kRename}, {Tr(L"Ungroup folder"), kUngroup}};
     } else if (id.empty() && !Listing() && folder_ < 0) {
         // Two choices of their own: how much the menu holds, and how large its icons are.
-        const wchar_t* const kNames[] = {Tr(L"小"), Tr(L"中"), Tr(L"大"), Tr(L"极大")};
-        entries.push_back({Tr(L"菜单大小"), 0, false, true, true});
+        const wchar_t* const kNames[] = {Tr(L"Small"), Tr(L"Medium"), Tr(L"Large"), Tr(L"Huge")};
+        entries.push_back({Tr(L"Menu size"), 0, false, true, true});
         for (int grid = 0; grid <= room_; ++grid)
             entries.push_back({kNames[grid], kSize + grid, grid == grid_});
         entries.push_back({});
-        entries.push_back({Tr(L"图标大小"), 0, false, true, true});
+        entries.push_back({Tr(L"Icon size"), 0, false, true, true});
         for (int icon = 0; icon < StartLayout::kSizes; ++icon)
             entries.push_back({kNames[icon], kIcon + icon, icon == layout_.icon});
         if (!layout_.hidden.empty()) {
             entries.push_back({});
-            entries.push_back({Tr(L"显示隐藏的应用"), kShowHidden});
+            entries.push_back({Tr(L"Show hidden apps"), kShowHidden});
         }
         if (layout_.custom) {
             entries.push_back({});
-            entries.push_back({Tr(L"恢复为 Windows 开始菜单的固定项"), kReset});
+            entries.push_back({Tr(L"Restore Windows Start pins"), kReset});
         }
     }
     if (entries.empty())

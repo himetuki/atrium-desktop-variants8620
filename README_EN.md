@@ -33,7 +33,7 @@ The Windows desktop is several generations of design stacked on top of each othe
 - **One glass**: the bar, panels, menus, notifications and widgets share one material that shows the desktop behind it in real time.
 - **One design language**: corners, spacing, type and motion follow one set of rules, and the same control feels the same wherever it appears.
 - **Three independent modules**: the taskbar, desktop widgets and Stage Manager turn on and off on their own. Use just one if you like.
-- **Chinese and English**: choose 简体中文, English, or Follow Windows under System → Language; the bar, panels, menus, notifications, widgets and settings switch together.
+- **Chinese and English**: choose 简体中文, English, or Follow Windows under System → Language; the bar, panels, menus, notifications, widgets and settings switch together. Strings live under `locales/`, one JSON file per language; an untranslated key falls back to English.
 - **Clean**: no code injected into system processes, no system files changed, no services, no administrator rights. When you quit, Windows' own taskbar comes back as usual.
 
 ## Features

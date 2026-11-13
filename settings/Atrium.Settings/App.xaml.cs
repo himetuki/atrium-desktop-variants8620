@@ -13,7 +13,7 @@ public partial class App : Application
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int MessageBox(IntPtr hwnd, string text, string title, uint type);
     internal const uint OpenAboutMessage = 0x8000 + 31;
 
-    public static string WindowTitle => Loc.T("Atrium 设置");
+    public static string WindowTitle => Loc.T("Atrium Settings");
     internal static MainWindow? CurrentWindow { get; private set; }
     private static BarSettings? s_pendingCurrent, s_pendingSaved;
     private static Mutex? s_instance;
@@ -59,7 +59,7 @@ public partial class App : Application
                 catch (Exception error) when (error is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { }
                 if (!same)
                 {
-                    MessageBox(IntPtr.Zero, Loc.T("另一位置的 Atrium 设置正在运行。请先关闭该窗口，再打开本目录中的设置中心。"), "Atrium", 0x40);
+                    MessageBox(IntPtr.Zero, Loc.T("Atrium Settings is running from another location. Close that window, then open the settings in this folder."), "Atrium", 0x40);
                     Exit();
                     return;
                 }

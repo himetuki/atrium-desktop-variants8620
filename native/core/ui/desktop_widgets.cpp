@@ -1009,7 +1009,7 @@ void DesktopWidgets::PickFolder(Widget& w)
     FILEOPENDIALOGOPTIONS o = 0;
     dialog->GetOptions(&o);
     dialog->SetOptions(o | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
-    dialog->SetTitle(Tr(L"选择照片文件夹"));
+    dialog->SetTitle(Tr(L"Choose a photo folder"));
     Widget* wp = &w;
     winrt::com_ptr<IShellItem> item;
     PWSTR path = nullptr;
@@ -1469,14 +1469,14 @@ void DesktopWidgets::PickCity(Widget& w, POINT at)
     if (!menu)
         return;
     const std::vector<std::wstring> cities = WidgetCities(w.kind, w.content.cities);
-    std::vector<MenuEntry> slots{{Tr(L"更改哪个城市"), 0, false, false, true}};
+    std::vector<MenuEntry> slots{{Tr(L"Change which city"), 0, false, false, true}};
     for (size_t i = 0; i < cities.size(); ++i)
         slots.push_back({Tr(cities[i].c_str()), int(i) + 1});
     Widget* target = &w;
     menu->Open(std::move(slots), at, MenuPlace::Below, [this, target, at, cities](int slot) {
         if (slot <= 0 || !Has(target))
             return;
-        std::vector<MenuEntry> list{{TrFormat(L"把「%s」换成", Tr(cities[size_t(slot - 1)].c_str())), 0, false, false, true}};
+        std::vector<MenuEntry> list{{TrFormat(L"Change “%s” to", Tr(cities[size_t(slot - 1)].c_str())), 0, false, false, true}};
         const auto& all = WorldCities();
         for (size_t i = 0; i < all.size(); ++i)
             list.push_back({Tr(all[i].name), int(i) + 1, cities[size_t(slot - 1)] == all[i].name});
@@ -1501,26 +1501,26 @@ void DesktopWidgets::Menu(Widget& w)
     enum { kSmall = 1, kMedium, kLarge, kRemove, kFolder, kNextPhoto, kClearDone, kAdd, kCities };
     std::vector<MenuEntry> entries;
     auto size = [&](int id, WidgetSize s, const wchar_t* label) { entries.push_back({label, id, w.size == s, !WidgetSupports(w.kind, s)}); };
-    size(kSmall, WidgetSize::Small, Tr(L"小"));
-    size(kMedium, WidgetSize::Medium, Tr(L"中"));
-    size(kLarge, WidgetSize::Large, Tr(L"大"));
+    size(kSmall, WidgetSize::Small, Tr(L"Small"));
+    size(kMedium, WidgetSize::Medium, Tr(L"Medium"));
+    size(kLarge, WidgetSize::Large, Tr(L"Large"));
     entries.push_back({});
     if (w.kind == WidgetKind::Photos) {
-        entries.push_back({Tr(L"选择照片文件夹…"), kFolder});
-        entries.push_back({Tr(L"换一张"), kNextPhoto});
+        entries.push_back({Tr(L"Choose a photo folder…"), kFolder});
+        entries.push_back({Tr(L"Next photo"), kNextPhoto});
         entries.push_back({});
     }
     if (HasWorldClocks(w.kind, w.size)) {
-        entries.push_back({Tr(L"更改城市…"), kCities});
+        entries.push_back({Tr(L"Choose city…"), kCities});
         entries.push_back({});
     }
     if (w.kind == WidgetKind::Reminders) {
         bool anyDone = std::any_of(w.content.items.begin(), w.content.items.end(), [](const Reminder& r) { return r.done; });
-        entries.push_back({Tr(L"清除已完成"), kClearDone, false, !anyDone});
+        entries.push_back({Tr(L"Clear completed"), kClearDone, false, !anyDone});
         entries.push_back({});
     }
-    entries.push_back({Tr(L"移除小组件"), kRemove});
-    entries.push_back({Tr(L"添加小组件…"), kAdd});
+    entries.push_back({Tr(L"Remove widget"), kRemove});
+    entries.push_back({Tr(L"Add Widgets…"), kAdd});
     POINT p;
     GetCursorPos(&p);
     Widget* target = &w;

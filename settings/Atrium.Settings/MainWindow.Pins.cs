@@ -23,10 +23,10 @@ public sealed class PinVm : INotifyPropertyChanged
         _owner = owner;
         Pin = pin;
         Title = MainWindow.PinTitle(pin);
-        UpName = Loc.F("上移 {0}", Title);
-        DownName = Loc.F("下移 {0}", Title);
-        RemoveName = Loc.F("移除 {0}", Title);
-        LaunchName = Loc.F("启动方式 {0}", Title);
+        UpName = Loc.F("Move up {0}", Title);
+        DownName = Loc.F("Move down {0}", Title);
+        RemoveName = Loc.F("Remove {0}", Title);
+        LaunchName = Loc.F("Launch mode {0}", Title);
     }
 
     internal PinnedApp Pin { get; private set; }
@@ -150,7 +150,7 @@ public sealed partial class MainWindow
         if (index < 0 || to < 0 || to >= _pinVms.Count) return;
         _pinVms.Move(index, to);
         SyncPins();
-        FocusPinButton(vm, delta < 0 ? Loc.T("上移") : Loc.T("下移"));
+        FocusPinButton(vm, delta < 0 ? Loc.T("Move up") : Loc.T("Move down"));
         Changed();
     }
 
@@ -166,7 +166,7 @@ public sealed partial class MainWindow
         if (index < 0) return;
         _pinVms.RemoveAt(index);
         SyncPins();
-        if (_pinVms.Count > 0) FocusPinButton(_pinVms[Math.Min(index, _pinVms.Count - 1)], Loc.T("移除"));
+        if (_pinVms.Count > 0) FocusPinButton(_pinVms[Math.Min(index, _pinVms.Count - 1)], Loc.T("Remove"));
         Changed();
     }
 
@@ -223,14 +223,14 @@ public sealed partial class MainWindow
         if (file == null) return;
         if (_pinVms.Count >= 64)
         {
-            ShowMessage(InfoBarSeverity.Warning, Loc.T("固定的应用已达上限"), Loc.T("最多可以固定 64 个应用。"));
+            ShowMessage(InfoBarSeverity.Warning, Loc.T("Pinned apps limit reached"), Loc.T("You can pin at most 64 apps."));
             return;
         }
         var vm = new PinVm(this, new PinnedApp(System.IO.Path.GetFileNameWithoutExtension(file.Path), file.Path, "", ""));
         _pinVms.Add(vm);
         _ = LoadIconAsync(vm);
         SyncPins();
-        FocusPinButton(vm, Loc.T("移除"));
+        FocusPinButton(vm, Loc.T("Remove"));
         PinsList.ScrollIntoView(vm);
         Changed();
     }
@@ -241,10 +241,10 @@ public sealed partial class MainWindow
         {
             Style = (Style)Application.Current.Resources["AtriumDialogStyle"],
             XamlRoot = Content.XamlRoot,
-            Title = Loc.T("导入系统任务栏固定项？"),
-            Content = Loc.T("当前的固定列表将被 Windows 任务栏上固定的应用替换。"),
-            PrimaryButtonText = Loc.T("替换"),
-            CloseButtonText = Loc.T("取消"),
+            Title = Loc.T("Import Windows taskbar pins?"),
+            Content = Loc.T("The current pinned list will be replaced by the apps pinned to the Windows taskbar."),
+            PrimaryButtonText = Loc.T("Replace"),
+            CloseButtonText = Loc.T("Cancel"),
             DefaultButton = ContentDialogButton.Close,
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;

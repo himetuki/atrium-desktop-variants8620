@@ -247,7 +247,7 @@ void WeChatSource::Run()
                         if (baseline && rose && !r.muted) {
                             auto* n = new Notice();
                             n->source = L"wechat";
-                            n->app = Tr(L"微信");
+                            n->app = Tr(L"WeChat");
                             n->appId = exe;
                             n->title = r.chat;
                             n->body = r.summary;

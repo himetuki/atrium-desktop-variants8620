@@ -185,7 +185,7 @@ void OpenSettings(const wchar_t* page = nullptr)
             return;
     }
     Log(L"settings: Atrium.Settings.exe not found next to %s", dir.c_str());
-    MessageBoxW(nullptr, Tr(L"没有找到 Atrium.Settings.exe。请确认安装目录中的 Settings 文件夹完整。"), L"Atrium", MB_ICONWARNING);
+    MessageBoxW(nullptr, Tr(L"Atrium.Settings.exe was not found. Make sure the Settings folder in the installation directory is complete."), L"Atrium", MB_ICONWARNING);
 }
 
 void AddTrayIcon()
@@ -384,16 +384,16 @@ void SetStageManager(bool on)
 
 void ShowMenu(POINT pt)
 {
-    std::vector<MenuEntry> entries = {{Tr(L"外观设置…"), kCmdSettings}, {}, {Tr(L"显示桌面"), kCmdDesktop}, {Tr(L"任务管理器"), kCmdTaskManager}};
+    std::vector<MenuEntry> entries = {{Tr(L"Appearance Settings…"), kCmdSettings}, {}, {Tr(L"Show Desktop"), kCmdDesktop}, {Tr(L"Task Manager"), kCmdTaskManager}};
     if (g_app.widgetsOn)
-        entries.push_back({Tr(L"添加小组件…"), kCmdWidgets});
+        entries.push_back({Tr(L"Add Widgets…"), kCmdWidgets});
     // The three modules, each on its own.
     entries.push_back({});
-    entries.push_back({Tr(L"任务栏"), kCmdToggle, g_app.barOn.value_or(true)});
-    entries.push_back({Tr(L"桌面小组件"), kCmdWidgetsModule, g_app.widgetsOn});
-    entries.push_back({Tr(L"台前调度"), kCmdStage, g_app.stage->Enabled()});
+    entries.push_back({Tr(L"Taskbar"), kCmdToggle, g_app.barOn.value_or(true)});
+    entries.push_back({Tr(L"Desktop Widgets"), kCmdWidgetsModule, g_app.widgetsOn});
+    entries.push_back({Tr(L"Stage Manager"), kCmdStage, g_app.stage->Enabled()});
     entries.push_back({});
-    entries.push_back({Tr(L"退出 Atrium"), kCmdExit});
+    entries.push_back({Tr(L"Quit Atrium"), kCmdExit});
     g_app.menu->Open(std::move(entries), pt, MenuPlace::Above, [](int cmd) {
         switch (cmd) {
         case kCmdSettings:
@@ -728,11 +728,11 @@ void ShowItemMenu(const std::wstring& key, POINT pt)
         }
         if (std::shared_ptr<const JumpListData> jump = LoadJumpList(appId, pin.path)) {
             if (!jump->pinned.empty())
-                sections.push_back({L"已固定", jump->pinned});
+                sections.push_back({L"Pinned", jump->pinned});
             for (const JumpCategory& category : jump->categories)
                 sections.push_back({category.title, category.items});
             if (!jump->recent.empty())
-                sections.push_back({L"最近", jump->recent});
+                sections.push_back({L"Recent", jump->recent});
         } else {
             // No jump list file: the shell's own document lists are the next best thing.
             std::vector<ShellRecent> places, workspaces, files;
@@ -768,16 +768,16 @@ void ShowItemMenu(const std::wstring& key, POINT pt)
                 return items;
             };
             if (!places.empty())
-                sections.push_back({L"文件夹", toItems(places)});
+                sections.push_back({L"Folders", toItems(places)});
             if (!workspaces.empty())
-                sections.push_back({L"工作区", toItems(workspaces)});
+                sections.push_back({L"Workspaces", toItems(workspaces)});
             if (!files.empty())
-                sections.push_back({L"最近", toItems(files)});
+                sections.push_back({L"Recent", toItems(files)});
         }
     }
 
     std::vector<MenuEntry> entries = {{it->name, 0, false, false, true}, {L"", 0}};
-    entries.push_back({it->windows.empty() || !it->multipleWindows ? Tr(L"打开") : Tr(L"打开新窗口"), kCmdNewWindow});
+    entries.push_back({it->windows.empty() || !it->multipleWindows ? Tr(L"Open") : Tr(L"Open New Window"), kCmdNewWindow});
     size_t command = 0;
     for (auto& [title, rows] : sections) {
         if (rows.empty())
@@ -800,16 +800,16 @@ void ShowItemMenu(const std::wstring& key, POINT pt)
     const bool canRunAs =
         windowsEntries && !appPath.empty() && appPath.find(L"\\WindowsApps\\") == std::wstring::npos;
     if (canRunAs)
-        entries.push_back({Tr(L"以管理员身份运行"), kCmdRunAs});
+        entries.push_back({Tr(L"Run as administrator"), kCmdRunAs});
     std::wstring location = g_app.tasks->FileLocation(key);
     if (!location.empty())
-        entries.push_back({Tr(L"打开文件所在的位置"), kCmdOpenLocation});
-    entries.push_back({it->pinned ? Tr(L"从 Atrium 取消固定") : Tr(L"固定到 Atrium"), int(it->pinned ? kCmdUnpin : kCmdPin)});
+        entries.push_back({Tr(L"Open File Location"), kCmdOpenLocation});
+    entries.push_back({it->pinned ? Tr(L"Unpin from Atrium") : Tr(L"Pin to Atrium"), int(it->pinned ? kCmdUnpin : kCmdPin)});
     if (windowsEntries && !appPath.empty())
-        entries.push_back({Tr(L"属性"), kCmdProperties});
+        entries.push_back({Tr(L"Properties"), kCmdProperties});
     if (!it->windows.empty())
-        entries.push_back({it->windows.size() > 1 ? Tr(L"关闭所有窗口") : Tr(L"关闭窗口"), kCmdClose});
-    entries.push_back({Tr(L"关闭程序"), kCmdTerminate, false, !g_app.tasks->CanTerminate(key)});
+        entries.push_back({it->windows.size() > 1 ? Tr(L"Close All Windows") : Tr(L"Close Window"), kCmdClose});
+    entries.push_back({Tr(L"Close Program"), kCmdTerminate, false, !g_app.tasks->CanTerminate(key)});
     int pinIndex = it->pinIndex;
     auto windows = it->windows;
     std::wstring name = it->name;
@@ -841,10 +841,10 @@ void ShowItemMenu(const std::wstring& key, POINT pt)
             break;
         case kCmdTerminate: {
             // Ending the processes loses what is not saved: asked once more, in place.
-            std::vector<MenuEntry> confirm = {{TrFormat(L"强制关闭“%s”？未保存的内容会丢失", name.c_str()), 0, false, false, true},
+            std::vector<MenuEntry> confirm = {{TrFormat(L"Force close “%s”? Unsaved content will be lost", name.c_str()), 0, false, false, true},
                                               {L"", 0},
-                                              {Tr(L"强制关闭"), kCmdTerminateConfirm},
-                                              {Tr(L"取消"), 0}};
+                                              {Tr(L"Force close"), kCmdTerminateConfirm},
+                                              {Tr(L"Cancel"), 0}};
             g_app.menu->Open(std::move(confirm), pt, MenuPlace::AboveCentered, [key](int answer) {
                 if (answer == kCmdTerminateConfirm)
                     g_app.tasks->Terminate(key);
@@ -1215,11 +1215,11 @@ LRESULT CALLBACK HostProc(HWND h, UINT m, WPARAM w, LPARAM l)
                 notice.app = L"Atrium";
                 const std::wstring list = JoinNames(names);
                 if (ejected) {
-                    notice.title = Tr(L"安全删除硬件");
-                    notice.body = TrFormat(L"「%s」现在可以安全地拔出。", list.c_str());
+                    notice.title = Tr(L"Safe to remove hardware");
+                    notice.body = TrFormat(L"\"%s\" can now be safely unplugged.", list.c_str());
                 } else {
-                    notice.title = Tr(L"USB 设备已移除");
-                    notice.body = TrFormat(L"「%s」已从计算机移除。", list.c_str());
+                    notice.title = Tr(L"USB device removed");
+                    notice.body = TrFormat(L"\"%s\" has been removed from the computer.", list.c_str());
                 }
                 g_app.notes->Post(std::move(notice));
             }
@@ -1366,7 +1366,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR cmdLine, int)
             g_readyEvent = startupArguments[i + 1];
     LocalFree(startupArguments);
     if (wcscmp(cmdLine, L"--uninstall") == 0) {
-        if (MessageBoxW(nullptr, Tr(L"卸载 Atrium？个人设置和桌面小组件布局将会保留。"), L"Atrium",
+        if (MessageBoxW(nullptr, Tr(L"Uninstall Atrium? Your personal settings and desktop widget layout will be kept."), L"Atrium",
                         MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2 | MB_SETFOREGROUND) != IDYES)
             return 0;
         wchar_t system[MAX_PATH]{};
@@ -1416,7 +1416,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR cmdLine, int)
         // Another copy (an older version unzipped elsewhere, #44): this one may take over, and
         // the logon entry and the registration move here as it starts.
         bool replaced = false;
-        if (other && MessageBoxW(nullptr, Tr(L"另一位置的 Atrium 正在运行。要退出它，改用本目录中的版本吗？"), L"Atrium",
+        if (other && MessageBoxW(nullptr, Tr(L"Atrium is running from another location. Quit it and use the version in this folder?"), L"Atrium",
                                  MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND) == IDYES) {
             DWORD pid = 0;
             GetWindowThreadProcessId(other, &pid);

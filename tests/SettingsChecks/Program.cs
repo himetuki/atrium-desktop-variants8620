@@ -56,7 +56,7 @@ Require(BarSettings.FromJson(new JsonObject(), new()).NotifyPlacement == "dock",
 Require(BarSettings.FromJson(new JsonObject(), new()).Language == "auto", "Old files must follow the system language.");
 settings.Language = "en";
 Require(BarSettings.FromJson(settings.ToJson(), new()).Language == "en", "The interface language must survive a round trip.");
-Require(BarSettings.FromJson(JsonNode.Parse("""{"language":"bad"}""")!.AsObject(), settings).Language == "auto", "Invalid languages must follow the system.");
+Require(BarSettings.FromJson(JsonNode.Parse("""{"language":"bad tag"}""")!.AsObject(), settings).Language == "auto", "Invalid languages must follow the system.");
 Require(BarSettings.FromJson(JsonNode.Parse("""{"language":false}""")!.AsObject(), settings).Language == "en", "Malformed languages must retain the current value.");
 Require(BarSettings.FromJson(JsonNode.Parse("""{"notifyPlacement":"bad"}""")!.AsObject(), new()).NotifyPlacement == "dock", "Invalid notification placement must normalize.");
 Require(BarSettings.FromJson(JsonNode.Parse("""{"notifyPlacement":false}""")!.AsObject(), settings).NotifyPlacement == "topRight", "Malformed notification placement must retain the current value.");

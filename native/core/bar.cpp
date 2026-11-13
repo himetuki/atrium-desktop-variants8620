@@ -1633,29 +1633,29 @@ RECT Bar::BarRect() const
 std::wstring Bar::TooltipText(const std::wstring& key) const
 {
     if (key == kStartKey)
-        return Tr(L"开始");
+        return Tr(L"Start");
     if (key == kNotifyKey)
-        return unread_ ? TrFormat(L"%d 条未读通知", int(unread_)) : Tr(L"通知");
+        return unread_ ? TrFormat(L"%d unread notifications", int(unread_)) : Tr(L"Notifications");
     if (key == kTrayKey)
-        return Tr(L"托盘");
+        return Tr(L"Tray");
     if (key == kStatusKey) {
         const SystemStatus& st = status_;
         std::wstring net;
         if (!st.connected)
-            net = Tr(L"未连接网络");
+            net = Tr(L"No network");
         else if (st.wifi)
-            net = TrFormat(L"Wi-Fi %s · 信号 %d%%", st.network.c_str(), st.signal);
+            net = TrFormat(L"Wi-Fi %s · signal %d%%", st.network.c_str(), st.signal);
         else
             net = st.network;
         std::wstring more;
         if (st.battery)
-            more = st.charging ? TrFormat(L"\n电池 %d%% · 已接通电源", st.batteryPercent) : TrFormat(L"\n电池 %d%%", st.batteryPercent);
+            more = st.charging ? TrFormat(L"\nBattery %d%% · plugged in", st.batteryPercent) : TrFormat(L"\nBattery %d%%", st.batteryPercent);
         if (st.audio)
-            more += st.muted ? Tr(L"\n静音") : TrFormat(L"\n音量 %d%%", st.volume);
+            more += st.muted ? Tr(L"\nMuted") : TrFormat(L"\nVolume %d%%", st.volume);
         return net + more;
     }
     if (key == kMoreKey)
-        return TrFormat(L"另外 %d 个应用", int(hidden_.size()));
+        return TrFormat(L"%d more apps", int(hidden_.size()));
     if (key == kClockKey) {
         wchar_t buf[128] = {};
         GetDateFormatEx(LOCALE_NAME_USER_DEFAULT, DATE_LONGDATE, nullptr, nullptr, buf, 128, nullptr);
@@ -1663,7 +1663,7 @@ std::wstring Bar::TooltipText(const std::wstring& key) const
     }
     for (const auto& t : items_)
         if (t.key == key)
-            return t.windows.size() > 1 ? TrFormat(L"%s · %d 个窗口", t.name.c_str(), int(t.windows.size())) : t.name;
+            return t.windows.size() > 1 ? TrFormat(L"%s · %d windows", t.name.c_str(), int(t.windows.size())) : t.name;
     return {};
 }
 

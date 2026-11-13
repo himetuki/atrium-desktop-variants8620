@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "source": "en",
+  "default": "en",
+  "languages": [
+    {
+      "tag": "en",
+      "name": "English"
+    },
+    {
+      "tag": "zh-Hans",
+      "name": "简体中文"
+    }
+  ]
+}

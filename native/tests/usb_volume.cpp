@@ -148,7 +148,7 @@ int main(int argc, char** argv)
     Check(VolumeName(L"", L'E') == L"E:", "a volume without a label is named by its letter");
 
     Check(JoinNames({L"E:"}) == L"E:", "a single name is not joined");
-    Check(JoinNames({L"E:", L"F:"}) == std::wstring(L"E:") + Tr(L"、") + L"F:", "the names are joined");
+    Check(JoinNames({L"E:", L"F:"}) == std::wstring(L"E:") + Tr(L", ") + L"F:", "the names are joined");
 
     CheckReconciliation();
     CheckWorker();

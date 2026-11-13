@@ -2,357 +2,267 @@
 
 #include <windows.h>
 
+#include <winrt/Windows.Data.Json.h>
+#include <winrt/Windows.Foundation.Collections.h>
+
 #include <atomic>
 #include <cstdarg>
 #include <cstdio>
 #include <cwchar>
+#include <filesystem>
+#include <fstream>
 #include <iterator>
+#include <memory>
+#include <mutex>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 namespace atrium {
 
 namespace {
 
-struct Entry {
-    const wchar_t* zh;
-    const wchar_t* en;
+namespace json = winrt::Windows::Data::Json;
+
+struct Locale {
+    std::wstring tag = L"en";
+    std::unordered_map<std::wstring, std::wstring> strings;
+    std::unordered_map<std::wstring, std::unordered_map<std::wstring, std::wstring>> plurals;
+    std::unordered_map<std::wstring, std::wstring> legacy;
 };
 
-// Chinese source text -> English. This is the single place the native
-// interface's English wording lives; call sites name the Chinese string.
-const Entry kEnglish[] = {
-    // main.cpp: the bar's menu, app menus and startup messages.
-    {L"没有找到 Atrium.Settings.exe。请确认安装目录中的 Settings 文件夹完整。",
-     L"Atrium.Settings.exe was not found. Make sure the Settings folder in the installation directory is complete."},
-    {L"外观设置…", L"Appearance Settings…"},
-    {L"显示桌面", L"Show Desktop"},
-    {L"任务管理器", L"Task Manager"},
-    {L"添加小组件…", L"Add Widgets…"},
-    {L"任务栏", L"Taskbar"},
-    {L"桌面小组件", L"Desktop Widgets"},
-    {L"台前调度", L"Stage Manager"},
-    {L"退出 Atrium", L"Quit Atrium"},
-    {L"打开", L"Open"},
-    {L"打开新窗口", L"Open New Window"},
-    {L"打开文件所在的位置", L"Open File Location"},
-    {L"从 Atrium 取消固定", L"Unpin from Atrium"},
-    {L"固定到 Atrium", L"Pin to Atrium"},
-    {L"关闭所有窗口", L"Close All Windows"},
-    {L"关闭窗口", L"Close Window"},
-    {L"关闭程序", L"Close Program"},
-    {L"卸载 Atrium？个人设置和桌面小组件布局将会保留。",
-     L"Uninstall Atrium? Your personal settings and desktop widget layout will be kept."},
-    {L"另一位置的 Atrium 正在运行。要退出它，改用本目录中的版本吗？",
-     L"Atrium is running from another location. Quit it and use the version in this folder?"},
-    // settings.cpp
-    {L"设置已保存，但未能修改 Windows 开机启动。请重新切换开机启动后再保存。",
-     L"Settings were saved, but Windows startup could not be changed. Toggle Start with Windows again, then save."},
-    {L"有线网络", L"Ethernet"},
-    {L"没有无线网卡", L"No Wi-Fi adapter"},
-    {L"已关闭", L"Off"},
-    {L"已连接", L"Connected"},
-    {L"未连接", L"Not connected"},
-    {L"不可用", L"Unavailable"},
-    {L"已打开", L"On"},
-    {L"蓝牙", L"Bluetooth"},
-    {L"已充满", L"Fully charged"},
-    {L"正在充电", L"Charging"},
-    {L"使用电池", L"On battery"},
-    {L"电源", L"Power"},
-    {L"已接通电源", L"Plugged in"},
-    {L"投屏", L"Cast"},
-    {L"无线显示器", L"Wireless display"},
-    {L"已打开 · 最近使用的应用在右侧", L"On · Recent apps on the right"},
-    {L"已打开 · 最近使用的应用在左侧", L"On · Recent apps on the left"},
-    {L"显示器", L"Display"},
-    {L"不支持调节", L"Not adjustable"},
-    {L"没有播放设备", L"No output device"},
-    {L"静音", L"Muted"},
-    {L"声音", L"Sound"},
-    {L"Wi-Fi 已关闭", L"Wi-Fi is off"},
-    {L"没有找到 Wi-Fi 网络", L"No Wi-Fi networks found"},
-    {L"正在搜索网络…", L"Searching for networks…"},
-    {L"断开", L"Disconnect"},
-    {L"输入密码…", L"Enter password…"},
-    {L"连接", L"Connect"},
-    {L"网络和 Internet 设置", L"Network & Internet settings"},
-    {L"更多 Wi-Fi 网络", L"More Wi-Fi networks"},
-    {L"这台电脑没有蓝牙", L"This PC has no Bluetooth"},
-    {L"蓝牙已关闭", L"Bluetooth is off"},
-    {L"没有已配对的设备", L"No paired devices"},
-    {L"正在读取设备…", L"Reading devices…"},
-    {L"蓝牙和其他设备设置", L"Bluetooth & devices settings"},
-    {L"声音输出", L"Sound output"},
-    {L"正在读取…", L"Reading…"},
-    {L"音量合成器", L"Volume mixer"},
-    {L"没有应用在播放声音", L"No apps are playing sound"},
-    {L"更多音量设置", L"More sound settings"},
-    {L"音量合成器设置", L"Volume mixer settings"},
-    {L"正在搜索无线显示器…", L"Searching for wireless displays…"},
-    {L"没有找到无线显示器", L"No wireless displays found"},
-    {L"正在连接…", L"Connecting…"},
-    {L"投影模式", L"Projection mode"},
-    {L"只连接了一个显示器", L"Only one display is connected"},
-    {L"仅电脑屏幕", L"PC screen only"},
-    {L"复制", L"Duplicate"},
-    {L"扩展", L"Extend"},
-    {L"仅第二屏幕", L"Second screen only"},
-    {L"投影到此电脑", L"Project to this PC"},
-    {L"系统投屏面板", L"System cast panel"},
-    {L"用户", L"User"},
-    {L"搜索应用和文件夹", L"Search apps and folders"},
-    {L"返回", L"Back"},
-    {L"全部应用", L"All apps"},
-    {L"还没有固定的应用。右键单击搜索结果或“全部应用”里的应用来固定", L"Nothing is pinned yet. Right-click an app in the search results or All apps to pin it."},
-    {L"没有找到应用", L"No apps found"},
-    {L"没有应用", L"No apps"},
-    {L"已隐藏", L"Hidden"},
-    {L"Enter 打开", L"Enter to open"},
-    {L"睡眠", L"Sleep"},
-    {L"重启", L"Restart"},
-    {L"关机", L"Shut down"},
-    {L"锁定", L"Lock"},
-    {L"新建文件夹", L"New folder"},
-    {L"固定到任务栏", L"Pin to taskbar"},
-    {L"固定到开始菜单", L"Pin to Start"},
-    {L"移出文件夹", L"Remove from folder"},
-    {L"从开始菜单移除", L"Remove from Start"},
-    {L"取消隐藏", L"Unhide"},
-    {L"隐藏", L"Hide"},
-    {L"重命名", L"Rename"},
-    {L"解散文件夹", L"Ungroup folder"},
-    {L"小", L"Small"},
-    {L"中", L"Medium"},
-    {L"大", L"Large"},
-    {L"显示隐藏的应用", L"Show hidden apps"},
-    {L"恢复为 Windows 开始菜单的固定项", L"Restore Windows Start pins"},
-    {L"刚刚", L"Just now"},
-    {L"内容已隐藏", L"Content hidden"},
-    {L"没有新通知", L"No new notifications"},
-    {L"全部清除", L"Clear All"},
-    {L"收起", L"Collapse"},
-    {L"日期和时间设置", L"Date & time settings"},
-    {L"今天", L"Today"},
-    {L"没有托盘图标", L"No tray icons"},
-    {L"读取不到系统托盘", L"The system tray is unavailable"},
-    {L"托盘图标", L"Tray icon"},
-    {L"托盘", L"Tray"},
-    {L"系统托盘", L"System tray"},
-    {L"窗口", L"Window"},
-    {L"选择照片文件夹", L"Choose a photo folder"},
-    {L"选择照片文件夹…", L"Choose a photo folder…"},
-    {L"换一张", L"Next photo"},
-    {L"清除已完成", L"Clear completed"},
-    {L"移除小组件", L"Remove widget"},
-    {L"本地", L"Local"},
-    {L"明天", L"Tomorrow"},
-    {L"昨天", L"Yesterday"},
-    // widget_faces.cpp: the world clock's cities (stored by their Chinese names).
-    {L"北京", L"Beijing"},
-    {L"上海", L"Shanghai"},
-    {L"香港", L"Hong Kong"},
-    {L"台北", L"Taipei"},
-    {L"东京", L"Tokyo"},
-    {L"首尔", L"Seoul"},
-    {L"新加坡", L"Singapore"},
-    {L"曼谷", L"Bangkok"},
-    {L"新德里", L"New Delhi"},
-    {L"迪拜", L"Dubai"},
-    {L"莫斯科", L"Moscow"},
-    {L"伊斯坦布尔", L"Istanbul"},
-    {L"开罗", L"Cairo"},
-    {L"约翰内斯堡", L"Johannesburg"},
-    {L"柏林", L"Berlin"},
-    {L"巴黎", L"Paris"},
-    {L"伦敦", L"London"},
-    {L"圣保罗", L"São Paulo"},
-    {L"纽约", L"New York"},
-    {L"多伦多", L"Toronto"},
-    {L"芝加哥", L"Chicago"},
-    {L"丹佛", L"Denver"},
-    {L"洛杉矶", L"Los Angeles"},
-    {L"温哥华", L"Vancouver"},
-    {L"安克雷奇", L"Anchorage"},
-    {L"檀香山", L"Honolulu"},
-    {L"悉尼", L"Sydney"},
-    {L"墨尔本", L"Melbourne"},
-    {L"奥克兰", L"Auckland"},
-    // desktop_widgets.cpp: the world clock's city menus.
-    {L"更改哪个城市", L"Change which city"},
-    {L"更改城市…", L"Choose city…"},
-    {L"把「%s」换成", L"Change “%s” to"},
-    // main.cpp: the app menu's forced close.
-    {L"强制关闭“%s”？未保存的内容会丢失", L"Force close “%s”? Unsaved content will be lost"},
-    {L"强制关闭", L"Force close"},
-    {L"取消", L"Cancel"},
-    {L"%.0f GB 可用", L"%.0f GB free"},
-    {L"处理器", L"CPU"},
-    {L"内存", L"Memory"},
-    {L"磁盘", L"Disk"},
-    {L"系统", L"System"},
-    {L"没有已连接的设备", L"No connected devices"},
-    {L"备忘录", L"Notes"},
-    {L"点按以记录…", L"Tap to write…"},
-    {L"提醒事项", L"Reminders"},
-    {L"新提醒", L"New Reminder"},
-    {L"点按以添加提醒", L"Tap to add a reminder"},
-    {L"照片", L"Photos"},
-    {L"右键选择照片文件夹", L"Right-click to choose a photo folder"},
-    {L"天气", L"Weather"},
-    {L"正在获取天气…", L"Fetching weather…"},
-    {L"日出", L"Sunrise"},
-    {L"日落", L"Sunset"},
-    {L"晴", L"Clear"},
-    {L"大部晴朗", L"Mostly clear"},
-    {L"局部多云", L"Partly cloudy"},
-    {L"阴", L"Overcast"},
-    {L"雾", L"Fog"},
-    {L"毛毛雨", L"Drizzle"},
-    {L"冻雨", L"Freezing rain"},
-    {L"小雨", L"Light rain"},
-    {L"中雨", L"Moderate rain"},
-    {L"大雨", L"Heavy rain"},
-    {L"小雪", L"Light snow"},
-    {L"中雪", L"Moderate snow"},
-    {L"大雪", L"Heavy snow"},
-    {L"雪粒", L"Snow grains"},
-    {L"阵雨", L"Rain showers"},
-    {L"强阵雨", L"Violent rain showers"},
-    {L"阵雪", L"Snow showers"},
-    {L"雷阵雨", L"Thunderstorm"},
-    {L"雷阵雨伴冰雹", L"Thunderstorm with hail"},
-    {L"多云", L"Cloudy"},
-    {L"无法确定位置", L"Location unavailable"},
-    {L"无法获取天气", L"Weather unavailable"},
-    {L"现在", L"Now"},
-    {L"元旦", L"New Year's Day"},
-    {L"劳动节", L"Labour Day"},
-    {L"国庆节", L"National Day"},
-    {L"春节", L"Spring Festival"},
-    {L"元宵节", L"Lantern Festival"},
-    {L"端午节", L"Dragon Boat Festival"},
-    {L"七夕", L"Qixi Festival"},
-    {L"中秋节", L"Mid-Autumn Festival"},
-    {L"重阳节", L"Double Ninth Festival"},
-    {L"腊八节", L"Laba Festival"},
-    {L"除夕", L"New Year's Eve"},
-    {L"系统声音", L"System Sounds"},
-    {L"应用", L"Apps"},
-    {L"更新已准备好", L"Update ready"},
-    {L"微信", L"WeChat"},
-    {L"飞书", L"Feishu"},
-    {L"开始", L"Start"},
-    {L"通知", L"Notifications"},
-    {L"未连接网络", L"Not connected"},
-    {L"%d 台设备已连接", L"%d devices connected"},
-    {L"剩余 %d 小时", L"%d hours left"},
-    {L"剩余 %d 分钟", L"%d minutes left"},
-    {L"蓝牙设备 %d", L"Bluetooth device %d"},
-    {L"无线显示器 %d", L"Wireless display %d"},
-    {L"%d 个应用", L"%d apps"},
-    {L"%d 分钟前", L"%d min ago"},
-    {L"%d 小时前", L"%d h ago"},
-    {L"%s  ·  %d 条", L"%s  ·  %d messages"},
-    {L"%d 个图标", L"%d icons"},
-    {L"最高 %s  最低 %s", L"H %s  L %s"},
-    {L"%d 条未读通知", L"%d unread notifications"},
-    {L"另外 %d 个应用", L"%d more apps"},
-    {L"%s · %d 个窗口", L"%s · %d windows"},
-    {L"Wi-Fi %s · 信号 %d%%", L"Wi-Fi %s · signal %d%%"},
-    {L"\n电池 %d%%", L"\nBattery %d%%"},
-    {L"\n电池 %d%% · 已接通电源", L"\nBattery %d%% · plugged in"},
-    {L"\n音量 %d%%", L"\nVolume %d%%"},
-    {L"\n静音", L"\nMuted"},
-    {L"通知  ·  %d", L"Notifications  ·  %d"},
-    {L"%s 已下载完成，可在关于中选择重启更新。", L"%s has been downloaded. Restart from About to install it."},
-    // main.cpp: the USB device card (shell/usb_volume.h).
-    {L"安全删除硬件", L"Safe to remove hardware"},
-    {L"USB 设备已移除", L"USB device removed"},
-    {L"「%s」现在可以安全地拔出。", L"\"%s\" can now be safely unplugged."},
-    {L"「%s」已从计算机移除。", L"\"%s\" has been removed from the computer."},
-    {L"、", L", "}, // the volume names joined in the card's body
+std::atomic<std::shared_ptr<const Locale>> g_active{
+    std::make_shared<Locale>()};
+std::mutex g_switch;
+std::vector<std::shared_ptr<const Locale>> g_retired;
+std::unordered_map<std::wstring, std::wstring> g_legacy;
+bool g_legacyLoaded = false;
 
-    {L"明天 %s小时", L"Tomorrow %s h"},
-    {L"昨天 %s小时", L"Yesterday %s h"},
-    {L"今天 %s小时", L"Today %s h"},
-    {L"已固定", L"Pinned"},
-    {L"最近", L"Recent"},
-    {L"常用", L"Frequent"},
-    {L"任务", L"Tasks"},
-    {L"文件夹", L"Folders"},
-    {L"工作区", L"Workspaces"},
-    {L"以管理员身份运行", L"Run as administrator"},
-    {L"属性", L"Properties"},
-    {L"菜单大小", L"Menu size"},
-    {L"图标大小", L"Icon size"},
-    {L"极大", L"Huge"},
-    {L"网络", L"Network"},
-    {L"没有可用的网络", L"No network"},
-    {L"本次接收 %s · 发送 %s", L"Received %s · sent %s"},
-    {L"无法写入 %s：%s（错误 %lu）", L"Could not write %s: %s (error %lu)"},
-    {L"\nAtrium 正以低完整性级别运行，不能写入用户目录。请把 Atrium 解压到普通文件夹（例如 D:\\Atrium），确认 Atrium.exe 没有“低”完整性标签后重新启动。",
-     L"\nAtrium is running at low integrity and cannot write to your profile. Unzip it to an ordinary folder (such as D:\\Atrium), make sure Atrium.exe has no Low integrity label, then start it again."},
-};
 
-const std::unordered_map<std::wstring_view, const wchar_t*>& English()
+std::wstring Utf8ToWide(const std::string& text)
 {
-    static const auto map = [] {
-        std::unordered_map<std::wstring_view, const wchar_t*> m;
-        m.reserve(std::size(kEnglish));
-        for (const Entry& e : kEnglish)
-            m.emplace(std::wstring_view(e.zh), e.en);
-        return m;
-    }();
-    return map;
+    if (text.empty())
+        return {};
+    const int size = MultiByteToWideChar(CP_UTF8, 0, text.data(), int(text.size()), nullptr, 0);
+    if (size <= 0)
+        return {};
+    std::wstring out(size_t(size), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, text.data(), int(text.size()), out.data(), size);
+    return out;
 }
 
-std::atomic<bool> g_english = false;
-
-bool SystemPrefersEnglish()
+std::string ReadFile(const std::filesystem::path& path)
 {
-    const LANGID id = GetUserDefaultUILanguage();
-    return PRIMARYLANGID(id) != LANG_CHINESE;
+    std::ifstream file(path, std::ios::binary);
+    if (!file)
+        return {};
+    return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+}
+
+std::filesystem::path LocaleDir()
+{
+    wchar_t exe[MAX_PATH] = {};
+    if (!GetModuleFileNameW(nullptr, exe, MAX_PATH))
+        return {};
+    std::filesystem::path dir(exe);
+    dir.remove_filename();
+    // The portable build has <exe>/locales; a development build from
+    // native/build/... finds the repository's locales by walking up.
+    for (int i = 0; i < 8 && !dir.empty(); ++i) {
+        const std::filesystem::path candidate = dir / L"locales";
+        if (std::filesystem::exists(candidate / L"manifest.json"))
+            return candidate;
+        dir = dir.parent_path();
+    }
+    return {};
+}
+
+std::wstring HString(const winrt::hstring& text) { return std::wstring(text.c_str()); }
+
+void LoadStrings(const json::JsonObject& root, Locale& locale)
+{
+    if (!root.HasKey(L"strings") || root.GetNamedValue(L"strings").ValueType() != json::JsonValueType::Object)
+        return;
+    const json::JsonObject strings = root.GetNamedObject(L"strings");
+    for (const auto& pair : strings) {
+        const std::wstring key = HString(pair.Key());
+        const json::IJsonValue value = pair.Value();
+        if (value.ValueType() == json::JsonValueType::String) {
+            locale.strings[key] = HString(value.GetString());
+        } else if (value.ValueType() == json::JsonValueType::Object) {
+            const json::JsonObject forms = value.GetObject();
+            auto& plural = locale.plurals[key];
+            for (const auto& form : forms) {
+                if (form.Value().ValueType() == json::JsonValueType::String)
+                    plural[HString(form.Key())] = HString(form.Value().GetString());
+            }
+        }
+    }
+}
+
+bool LoadLocale(const std::filesystem::path& path, Locale& locale)
+{
+    const std::string bytes = ReadFile(path);
+    if (bytes.empty())
+        return false;
+    try {
+        const json::JsonObject root = json::JsonObject::Parse(Utf8ToWide(bytes));
+        LoadStrings(root, locale);
+        return !locale.strings.empty() || !locale.plurals.empty();
+    } catch (...) {
+        return false;
+    }
+}
+
+void LoadLegacy(Locale& locale)
+{
+    if (!g_legacyLoaded) {
+        Locale legacy;
+        if (LoadLocale(LocaleDir() / L"legacy.json", legacy))
+            g_legacy = std::move(legacy.strings);
+        g_legacyLoaded = true;
+    }
+    locale.legacy = g_legacy;
+}
+
+const std::wstring* Find(const Locale& locale, const wchar_t* key, const wchar_t* context)
+{
+    if (!key || !*key)
+        return nullptr;
+    auto find = [&](const std::wstring& candidate) -> const std::wstring* {
+        const auto it = locale.strings.find(candidate);
+        return it == locale.strings.end() ? nullptr : &it->second;
+    };
+    if (context && *context) {
+        std::wstring qualified(key);
+        qualified += L'#';
+        qualified += context;
+        if (const std::wstring* text = find(qualified))
+            return text;
+    }
+    if (const std::wstring* text = find(key))
+        return text;
+
+    // OS data (jump list names, app names, cities, lunar festivals) arrives in
+    // Chinese. The legacy table turns it into the English key, then the normal
+    // locale lookup translates it. Static UI strings use English keys directly.
+    const auto legacy = locale.legacy.find(key);
+    if (legacy != locale.legacy.end()) {
+        if (const std::wstring* text = find(legacy->second))
+            return text;
+        return &legacy->second;
+    }
+    return nullptr;
+}
+
+bool SystemPrefersChinese()
+{
+    return PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_CHINESE;
+}
+
+std::wstring NormalizeTag(std::wstring tag)
+{
+    if (tag.empty() || tag == L"auto")
+        return SystemPrefersChinese() ? L"zh-Hans" : L"en";
+    if (tag == L"zh")
+        return L"zh-Hans";
+    return tag;
 }
 
 } // namespace
 
 bool SetLanguage(const std::wstring& setting)
 {
-    const bool before = g_english.load(std::memory_order_relaxed);
-    if (setting == L"en")
-        g_english.store(true, std::memory_order_relaxed);
-    else if (setting == L"zh")
-        g_english.store(false, std::memory_order_relaxed);
-    else
-        g_english.store(SystemPrefersEnglish(), std::memory_order_relaxed);
-    return before != g_english.load(std::memory_order_relaxed);
+    const std::wstring tag = NormalizeTag(setting);
+    auto locale = std::make_shared<Locale>();
+    locale->tag = tag;
+    LoadLegacy(*locale);
+    if (tag != L"en" && !LoadLocale(LocaleDir() / (tag + L".json"), *locale)) {
+        locale->tag = L"en";
+        locale->strings.clear();
+        locale->plurals.clear();
+    }
+
+    std::lock_guard lock(g_switch);
+    const auto before = g_active.load();
+    const bool changed = before->tag != locale->tag;
+    if (before->tag != locale->tag || before->strings != locale->strings)
+        g_retired.push_back(before); // Tr() pointers may still be in use
+    g_active.store(std::move(locale));
+    return changed;
 }
 
-bool LanguageIsEnglish() { return g_english.load(std::memory_order_relaxed); }
+bool LanguageIsEnglish() { return g_active.load()->tag.rfind(L"zh", 0) != 0; }
 
-const wchar_t* Tr(const wchar_t* chinese)
+std::wstring LanguageTag() { return g_active.load()->tag; }
+
+const wchar_t* Tr(const wchar_t* key, const wchar_t* context)
 {
-    if (!chinese || !g_english.load(std::memory_order_relaxed))
-        return chinese;
-    const auto& map = English();
-    auto it = map.find(std::wstring_view(chinese));
-    return it == map.end() ? chinese : it->second;
+    if (!key)
+        return L"";
+    const auto locale = g_active.load();
+    if (const std::wstring* text = Find(*locale, key, context))
+        return text->c_str();
+    return key;
 }
 
-std::wstring TrFormat(const wchar_t* chinese, ...)
+std::wstring TrFormat(const wchar_t* key, ...)
 {
-    const wchar_t* format = Tr(chinese);
+    const wchar_t* format = Tr(key);
     va_list args;
-    va_start(args, chinese);
+    va_start(args, key);
     const int length = _vscwprintf(format, args);
     va_end(args);
     if (length <= 0)
         return std::wstring(format);
     std::wstring text(size_t(length), L'\0');
-    va_start(args, chinese);
+    va_start(args, key);
     vswprintf_s(text.data(), text.size() + 1, format, args);
     va_end(args);
+    return text;
+}
+
+std::wstring TrPlural(const wchar_t* key, int count, const wchar_t* context)
+{
+    if (!key)
+        return {};
+    const auto locale = g_active.load();
+    std::wstring qualified(key);
+    if (context && *context) {
+        qualified += L'#';
+        qualified += context;
+    }
+    auto findPlural = [&](const std::wstring& candidate) -> const std::unordered_map<std::wstring, std::wstring>* {
+        const auto it = locale->plurals.find(candidate);
+        if (it != locale->plurals.end())
+            return &it->second;
+        const auto legacy = locale->legacy.find(candidate);
+        if (legacy != locale->legacy.end()) {
+            const auto translated = locale->plurals.find(legacy->second);
+            if (translated != locale->plurals.end())
+                return &translated->second;
+        }
+        return nullptr;
+    };
+    const auto* forms = findPlural(qualified);
+    if (!forms)
+        forms = findPlural(key);
+    std::wstring text;
+    if (forms) {
+        const auto one = forms->find(L"one");
+        const auto other = forms->find(L"other");
+        if (count == 1 && one != forms->end())
+            text = one->second;
+        else if (other != forms->end())
+            text = other->second;
+        else if (one != forms->end())
+            text = one->second;
+    }
+    if (text.empty())
+        text = Tr(key, context);
+    const std::wstring number = std::to_wstring(count);
+    if (const size_t at = text.find(L"{0}"); at != std::wstring::npos)
+        text.replace(at, 3, number);
     return text;
 }
 

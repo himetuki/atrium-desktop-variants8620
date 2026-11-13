@@ -269,7 +269,7 @@
             <!-- "Restore defaults" beside a group's title: quiet until the pointer is on it. -->
             <Style x:Key="ResetButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
                 <Setter Property="Template" Value="{StaticResource G3ButtonTemplate}" />
-                <Setter Property="Content" Value="恢复默认" />
+                <Setter Property="Content" Value="Restore defaults" />
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="Foreground" Value="{ThemeResource InkTertiaryBrush}" />
                 <Setter Property="FontSize" Value="12" />

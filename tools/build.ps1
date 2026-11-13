@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   Builds Atrium and assembles a portable folder: dist/Atrium/.
 
@@ -38,6 +38,7 @@ try {
         Remove-Item -Recurse -Force $dist
     }
     New-Item -ItemType Directory -Force $dist | Out-Null
+    Copy-Item (Join-Path $root "locales") $dist -Recurse
     dotnet publish settings/Atrium.Settings/Atrium.Settings.csproj -c $Configuration -p:AtriumDevelopment=$($Development.IsPresent.ToString().ToLowerInvariant()) -o (Join-Path $dist "Settings")
     if ($LASTEXITCODE) { throw "settings publish failed" }
 

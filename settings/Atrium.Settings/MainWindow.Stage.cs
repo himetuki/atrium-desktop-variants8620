@@ -28,11 +28,11 @@ public sealed partial class MainWindow
 
     private static readonly StageApp[] StageApps =
     {
-        new("备忘录", Color.FromArgb(255, 0xFF, 0xC6, 0x0A), false),
-        new("邮件", Color.FromArgb(255, 0x1E, 0x7B, 0xFF), false),
-        new("日历", Color.FromArgb(255, 0xFF, 0x3B, 0x30), false),
-        new("照片", Color.FromArgb(255, 0xFF, 0x95, 0x00), false),
-        new("终端", Color.FromArgb(255, 0x2C, 0x2C, 0x2E), true),
+        new("Notes", Color.FromArgb(255, 0xFF, 0xC6, 0x0A), false),
+        new("Mail", Color.FromArgb(255, 0x1E, 0x7B, 0xFF), false),
+        new("Calendar", Color.FromArgb(255, 0xFF, 0x3B, 0x30), false),
+        new("Photos", Color.FromArgb(255, 0xFF, 0x95, 0x00), false),
+        new("Terminal", Color.FromArgb(255, 0x2C, 0x2C, 0x2E), true),
     };
 
     // Preview DIP: the desktop's boxes (172 x 112, 22 from the edge, turned 22 degrees) at about 0.6.
@@ -125,10 +125,10 @@ public sealed partial class MainWindow
         StageCanvas.Width = W;
         StageCanvas.Height = H;
         bool on = _current.StageManager;
-        string side = _current.StageOnRight ? Loc.T("右") : Loc.T("左");
-        StageCaption.Text = !on ? Loc.T("台前调度已关闭：窗口照常叠放在桌面上")
-            : _current.StageAutoHide ? Loc.F("把指针移到预览的{0}边缘，卡片滑出；点按换到前面，按住 Shift 点按加入这一组", side)
-            : Loc.F("点按{0}侧的卡片换到前面；按住 Shift 点按，加入当前这一组", side);
+        string side = _current.StageOnRight ? Loc.T("Right") : Loc.T("Left");
+        StageCaption.Text = !on ? Loc.T("Stage Manager is off: windows stack on the desktop as usual")
+            : _current.StageAutoHide ? Loc.F("Rest the pointer at the preview's {0} edge to slide the cards out; click to bring one forward, Shift-click to add it to this group", side)
+            : Loc.F("Click a card on the {0} to bring it forward; Shift-click to add it to the current group", side);
         StageReplay.IsEnabled = on;
 
         StageCanvas.Children.Clear();
@@ -447,7 +447,7 @@ public sealed partial class MainWindow
                 Put(Plate(Vertical(Rgb(0xFFFFFF), Rgb(0xF3F3F6))), 0, 0);
                 Put(new TextBlock
                 {
-                    Text = Loc.T("周三"), Width = 64, TextAlignment = TextAlignment.Center, FontSize = 10.5, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Text = Loc.T("Wed"), Width = 64, TextAlignment = TextAlignment.Center, FontSize = 10.5, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                     Foreground = new SolidColorBrush(Rgb(0xFF3B30)), IsTextScaleFactorEnabled = false,
                 }, 0, 6);
                 Put(new TextBlock
@@ -572,7 +572,7 @@ public sealed partial class MainWindow
                 }
                 g.Children.Add(list);
                 var paper = new StackPanel { Spacing = 9, Padding = new Thickness(16, 12, 16, 0) };
-                paper.Children.Add(StageText(Loc.T("周末计划"), 13));
+                paper.Children.Add(StageText(Loc.T("Weekend plans"), 13));
                 foreach (double lw in new[] { 0.95, 0.8, 0.9, 0.6, 0.85, 0.4 }) paper.Children.Add(Bar(176 * lw, 5, line));
                 Grid.SetColumn(paper, 1);
                 g.Children.Add(paper);
@@ -605,7 +605,7 @@ public sealed partial class MainWindow
                 Grid.SetColumn(mails, 1);
                 g.Children.Add(mails);
                 var read = new StackPanel { Spacing = 8, Padding = new Thickness(12, 10, 12, 0) };
-                read.Children.Add(StageText(Loc.T("季度总结"), 11));
+                read.Children.Add(StageText(Loc.T("Quarterly review"), 11));
                 foreach (double lw in new[] { 0.9, 0.95, 0.7, 0.85, 0.5 }) read.Children.Add(Bar(128 * lw, 4, line));
                 Grid.SetColumn(read, 2);
                 g.Children.Add(read);
@@ -617,7 +617,7 @@ public sealed partial class MainWindow
                 g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) });
                 for (int r = 0; r < 5; r++) g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
                 for (int col = 0; col < 7; col++) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                var month = new TextBlock { Text = Loc.T("11月"), FontSize = 11, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = new SolidColorBrush(Rgb(0x1C1C1E)), IsTextScaleFactorEnabled = false };
+                var month = new TextBlock { Text = Loc.T("Nov"), FontSize = 11, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = new SolidColorBrush(Rgb(0x1C1C1E)), IsTextScaleFactorEnabled = false };
                 Grid.SetColumnSpan(month, 7);
                 g.Children.Add(month);
                 for (int d = 0; d < 35; d++)

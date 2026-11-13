@@ -56,7 +56,7 @@ internal sealed class BarSettings
     public bool ShowNotifications { get; set; } = true;
     public bool ShowRunning { get; set; } = true;
     public string TextColor { get; set; } = "auto"; // auto | light | dark
-    public string Language { get; set; } = "auto"; // auto (follow Windows) | zh | en
+    public string Language { get; set; } = "auto"; // auto (follow Windows) | a locale tag: en, zh-Hans, ...
     public string AutoHide { get; set; } = "fullscreen"; // never | fullscreen (a maximized or full-screen app in front) | always
     public string StatusStyle { get; set; } = "ring"; // ring | icons (network, volume, battery as on the Windows taskbar)
     public string DockDisplayMode { get; set; } = "primary"; // primary | follow | fixed | all
@@ -289,7 +289,9 @@ internal sealed class BarSettings
             ? (ahs is "never" or "always" ? ahs : "fullscreen")
             : f.AutoHide;
         string language = Display("language", f.Language);
-        s.Language = language is "zh" or "en" ? language : "auto";
+        bool validLanguage = !string.IsNullOrWhiteSpace(language) && language.Length <= 32 &&
+                             language.All(ch => char.IsLetterOrDigit(ch) || ch == '-');
+        s.Language = !validLanguage ? "auto" : language == "zh" ? "zh-Hans" : language;
         s.StatusStyle = o?["statusStyle"] is JsonValue ss && ss.TryGetValue(out string? sss) && sss == "icons" ? "icons"
             : o?["statusStyle"] is JsonValue ? "ring" : f.StatusStyle;
         s.Pins = f.Pins == null ? null : new List<PinnedApp>(f.Pins);
