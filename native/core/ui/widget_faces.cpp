@@ -55,9 +55,9 @@ const wchar_t* const kMonths[] = {L"一月", L"二月", L"三月", L"四月", L"
                                   L"七月", L"八月", L"九月", L"十月", L"十一月", L"十二月"};
 const wchar_t* const kMonthsEn[] = {L"January", L"February", L"March", L"April", L"May", L"June",
                                     L"July", L"August", L"September", L"October", L"November", L"December"};
-const wchar_t* WeekLong(int wd) { return LanguageIsEnglish() ? kWeekLongEn[wd] : kWeekLong[wd]; }
+const wchar_t* WeekLong(int wd) { return LanguageIsEnglish() ? Tr(kWeekLongEn[wd]) : kWeekLong[wd]; }
 const wchar_t* WeekShort(int wd) { return LanguageIsEnglish() ? kWeekShortEn[wd] : kWeekShort[wd]; }
-const wchar_t* MonthName(int m) { return LanguageIsEnglish() ? kMonthsEn[std::clamp(m, 1, 12) - 1] : kMonths[std::clamp(m, 1, 12) - 1]; }
+const wchar_t* MonthName(int m) { return LanguageIsEnglish() ? Tr(kMonthsEn[std::clamp(m, 1, 12) - 1]) : kMonths[std::clamp(m, 1, 12) - 1]; }
 
 bool ZoneInfo(const wchar_t* key, DYNAMIC_TIME_ZONE_INFORMATION& out)
 {
@@ -364,9 +364,9 @@ void PaintSystem(Canvas& c, WidgetSize size, const WidgetWorld& w, const Pal& p,
         float value;
         std::wstring detail;
     };
-    wchar_t mem[32], disk[32];
+    wchar_t mem[32];
     swprintf_s(mem, L"%.1f / %.0f GB", w.memoryGb, w.memoryTotalGb);
-    swprintf_s(disk, Tr(L"%.0f GB free"), w.diskFreeGb);
+    const std::wstring disk = TrFormat(L"%.0f GB free", w.diskFreeGb);
     const Gauge gauges[] = {{L"CPU", w.cpu, Tr(L"CPU")}, {Tr(L"Memory"), w.memory, mem}, {Tr(L"Disk"), w.disk, disk}};
     auto colour = [&](float v) { return v >= 0.9f ? p.red : v >= 0.7f ? p.orange : p.green; };
     auto pct = [](float v) { return std::to_wstring(int(std::lround(std::clamp(v, 0.f, 1.f) * 100))) + L"%"; };

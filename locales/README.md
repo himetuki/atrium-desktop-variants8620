@@ -20,6 +20,11 @@ locales/
 No C++ or C# change is needed: the native core loads `<exe>/locales/<tag>.json`
 and the settings app reads the same directory.
 
+Restart Atrium after editing resources. The core keeps one immutable snapshot
+per loaded language so text remains valid while settings change or workers use it.
+Files use UTF-8 (a BOM is accepted). Missing, empty or malformed translations
+fall back to the English key. Language tags cannot contain directory separators.
+
 ## Contexts
 
 Use the same English word in different places with a context suffix:
@@ -49,6 +54,21 @@ CLDR categories for future languages):
 ```
 
 Use `TrPlural(L"{0} items", count)` / `Loc.Plural("{0} items", count)`.
+
+Every plural entry needs an `other` form; `one` is optional. The count syntax is
+`{0}` and may occur more than once. Use `{{` and `}}` for literal braces.
+
+## Formats and checks
+
+Keep complete placeholders unchanged, including size modifiers, alignment and
+precision. Native printf conversions must remain in order (`%s`, `%lu`, etc.);
+managed composite fields may be reordered (`{1}` before `{0}`). Never add `%n`
+or positional printf conversions. The runtime falls back to the source format
+when a translated format is incompatible.
+
+The resource checker validates every language, context override and plural form.
+Duplicate JSON properties are checked within each object, so multiple plural
+entries can each contain `one` and `other`.
 
 ## Legacy names
 

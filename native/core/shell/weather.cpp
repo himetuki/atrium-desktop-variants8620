@@ -186,7 +186,7 @@ int64_t Minutes(const std::wstring& t, int* hour = nullptr, int* minute = nullpt
 
 const wchar_t* const kWeek[] = {L"周日", L"周一", L"周二", L"周三", L"周四", L"周五", L"周六"};
 const wchar_t* const kWeekEn[] = {L"Sun", L"Mon", L"Tue", L"Wed", L"Thu", L"Fri", L"Sat"};
-const wchar_t* WeekName(int wd) { return LanguageIsEnglish() ? kWeekEn[wd] : kWeek[wd]; }
+const wchar_t* WeekName(int wd) { return LanguageIsEnglish() ? Tr(kWeekEn[wd]) : kWeek[wd]; }
 
 json::JsonObject ToJson(const Weather& w)
 {

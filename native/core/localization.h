@@ -16,6 +16,7 @@ namespace atrium {
 
 // "auto" follows Windows' UI language (Chinese -> zh-Hans, anything else ->
 // en); any other value names a locale file. Unknown values fall back to en.
+// Locale snapshots are loaded on first use and reused until process exit.
 // Returns true when the active language changed.
 bool SetLanguage(const std::wstring& setting);
 bool LanguageIsEnglish();
@@ -24,6 +25,7 @@ std::wstring LanguageTag();
 // The text for an English key in the active language. `context` disambiguates
 // the same English word in different places ("Open" file vs menu); a context
 // lookup that has no entry falls back to the plain key.
+// Returned resource pointers remain valid across settings/language changes.
 const wchar_t* Tr(const wchar_t* key, const wchar_t* context = nullptr);
 
 // Formats a localized template (printf syntax) into a string.

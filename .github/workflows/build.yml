@@ -19,9 +19,24 @@ jobs:
       - name: Check localization tables
         shell: pwsh
         run: ./tools/check-localization.ps1
+      - name: Test localization validation
+        shell: pwsh
+        run: ./tools/tests/check-localization.tests.ps1
+      - name: Enable native regression checks
+        shell: pwsh
+        run: cmake --preset win-x64 -S native -DATRIUM_BUILD_TESTS=ON -DATRIUM_DEVELOPMENT=OFF
       - name: Build native, settings and the portable package
         shell: pwsh
         run: ./tools/build.ps1 -Zip
+      - name: Run native and settings regression checks
+        shell: pwsh
+        run: |
+          ctest --test-dir native/build/win-x64 -C Release --output-on-failure
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          dotnet run --project tests/SettingsChecks/SettingsChecks.csproj -c Release
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          dotnet run --project tests/LocalizationChecks/LocalizationChecks.csproj -c Release
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v7
         with:
           name: Atrium-win-x64

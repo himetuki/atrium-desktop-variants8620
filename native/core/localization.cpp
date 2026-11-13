@@ -1,4 +1,5 @@
 #include "localization.h"
+#include "localization_format.h"
 
 #include <windows.h>
 
@@ -34,7 +35,9 @@ struct Locale {
 std::atomic<std::shared_ptr<const Locale>> g_active{
     std::make_shared<Locale>()};
 std::mutex g_switch;
-std::vector<std::shared_ptr<const Locale>> g_retired;
+// Tr pointers can outlive a call or a language change. Cache each immutable
+// locale once, avoiding both dangling strings and a retired copy per edit.
+std::unordered_map<std::wstring, std::shared_ptr<const Locale>> g_loaded;
 std::unordered_map<std::wstring, std::wstring> g_legacy;
 bool g_legacyLoaded = false;
 
@@ -43,11 +46,12 @@ std::wstring Utf8ToWide(const std::string& text)
 {
     if (text.empty())
         return {};
-    const int size = MultiByteToWideChar(CP_UTF8, 0, text.data(), int(text.size()), nullptr, 0);
+    const int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), int(text.size()), nullptr, 0);
     if (size <= 0)
         return {};
     std::wstring out(size_t(size), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, text.data(), int(text.size()), out.data(), size);
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), int(text.size()), out.data(), size);
+    if (!out.empty() && out.front() == 0xFEFF) out.erase(0, 1);
     return out;
 }
 
@@ -56,6 +60,9 @@ std::string ReadFile(const std::filesystem::path& path)
     std::ifstream file(path, std::ios::binary);
     if (!file)
         return {};
+    std::error_code error;
+    const auto size = std::filesystem::file_size(path, error);
+    if (error || size > 2 * 1024 * 1024) return {};
     return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
 }
 
@@ -70,7 +77,8 @@ std::filesystem::path LocaleDir()
     // native/build/... finds the repository's locales by walking up.
     for (int i = 0; i < 8 && !dir.empty(); ++i) {
         const std::filesystem::path candidate = dir / L"locales";
-        if (std::filesystem::exists(candidate / L"manifest.json"))
+        std::error_code error;
+        if (std::filesystem::exists(candidate / L"manifest.json", error))
             return candidate;
         dir = dir.parent_path();
     }
@@ -88,14 +96,17 @@ void LoadStrings(const json::JsonObject& root, Locale& locale)
         const std::wstring key = HString(pair.Key());
         const json::IJsonValue value = pair.Value();
         if (value.ValueType() == json::JsonValueType::String) {
-            locale.strings[key] = HString(value.GetString());
+            const auto text = HString(value.GetString());
+            if (!text.empty() && text.find(L'\0') == std::wstring::npos) locale.strings[key] = text;
         } else if (value.ValueType() == json::JsonValueType::Object) {
             const json::JsonObject forms = value.GetObject();
-            auto& plural = locale.plurals[key];
+            std::unordered_map<std::wstring, std::wstring> plural;
             for (const auto& form : forms) {
                 if (form.Value().ValueType() == json::JsonValueType::String)
-                    plural[HString(form.Key())] = HString(form.Value().GetString());
+                    if (auto text = HString(form.Value().GetString()); !text.empty() && text.find(L'\0') == std::wstring::npos)
+                        plural[HString(form.Key())] = std::move(text);
             }
+            if (plural.contains(L"other")) locale.plurals[key] = std::move(plural);
         }
     }
 }
@@ -110,6 +121,8 @@ bool LoadLocale(const std::filesystem::path& path, Locale& locale)
         LoadStrings(root, locale);
         return !locale.strings.empty() || !locale.plurals.empty();
     } catch (...) {
+        locale.strings.clear();
+        locale.plurals.clear();
         return false;
     }
 }
@@ -118,7 +131,8 @@ void LoadLegacy(Locale& locale)
 {
     if (!g_legacyLoaded) {
         Locale legacy;
-        if (LoadLocale(LocaleDir() / L"legacy.json", legacy))
+        const auto directory = LocaleDir();
+        if (!directory.empty() && LoadLocale(directory / L"legacy.json", legacy))
             g_legacy = std::move(legacy.strings);
         g_legacyLoaded = true;
     }
@@ -133,25 +147,22 @@ const std::wstring* Find(const Locale& locale, const wchar_t* key, const wchar_t
         const auto it = locale.strings.find(candidate);
         return it == locale.strings.end() ? nullptr : &it->second;
     };
+    const auto alias = locale.legacy.find(key);
+    const wchar_t* source = alias == locale.legacy.end() ? key : alias->second.c_str();
     if (context && *context) {
-        std::wstring qualified(key);
+        std::wstring qualified(source);
         qualified += L'#';
         qualified += context;
         if (const std::wstring* text = find(qualified))
             return text;
     }
-    if (const std::wstring* text = find(key))
+    if (const std::wstring* text = find(source))
         return text;
 
     // OS data (jump list names, app names, cities, lunar festivals) arrives in
     // Chinese. The legacy table turns it into the English key, then the normal
     // locale lookup translates it. Static UI strings use English keys directly.
-    const auto legacy = locale.legacy.find(key);
-    if (legacy != locale.legacy.end()) {
-        if (const std::wstring* text = find(legacy->second))
-            return text;
-        return &legacy->second;
-    }
+    if (alias != locale.legacy.end()) return &alias->second;
     return nullptr;
 }
 
@@ -162,9 +173,11 @@ bool SystemPrefersChinese()
 
 std::wstring NormalizeTag(std::wstring tag)
 {
+    for (auto& ch : tag) if (ch >= L'A' && ch <= L'Z') ch += L'a' - L'A';
     if (tag.empty() || tag == L"auto")
         return SystemPrefersChinese() ? L"zh-Hans" : L"en";
-    if (tag == L"zh")
+    if (!localization::ValidTag(tag)) return L"en";
+    if (tag == L"zh" || tag == L"zh-hans")
         return L"zh-Hans";
     return tag;
 }
@@ -174,21 +187,26 @@ std::wstring NormalizeTag(std::wstring tag)
 bool SetLanguage(const std::wstring& setting)
 {
     const std::wstring tag = NormalizeTag(setting);
-    auto locale = std::make_shared<Locale>();
-    locale->tag = tag;
-    LoadLegacy(*locale);
-    if (tag != L"en" && !LoadLocale(LocaleDir() / (tag + L".json"), *locale)) {
-        locale->tag = L"en";
-        locale->strings.clear();
-        locale->plurals.clear();
-    }
-
     std::lock_guard lock(g_switch);
+    if (g_loaded.empty()) {
+        auto source = std::make_shared<Locale>();
+        LoadLegacy(*source);
+        g_loaded.emplace(L"en", std::move(source));
+    }
+    auto found = g_loaded.find(tag);
+    if (found == g_loaded.end()) {
+        auto locale = std::make_shared<Locale>();
+        locale->tag = tag;
+        LoadLegacy(*locale);
+        const auto directory = LocaleDir();
+        if (!directory.empty() && LoadLocale(directory / (tag + L".json"), *locale))
+            found = g_loaded.emplace(tag, std::move(locale)).first;
+        else
+            found = g_loaded.find(L"en");
+    }
     const auto before = g_active.load();
-    const bool changed = before->tag != locale->tag;
-    if (before->tag != locale->tag || before->strings != locale->strings)
-        g_retired.push_back(before); // Tr() pointers may still be in use
-    g_active.store(std::move(locale));
+    const bool changed = before->tag != found->second->tag;
+    g_active.store(found->second);
     return changed;
 }
 
@@ -208,13 +226,19 @@ const wchar_t* Tr(const wchar_t* key, const wchar_t* context)
 
 std::wstring TrFormat(const wchar_t* key, ...)
 {
-    const wchar_t* format = Tr(key);
+    if (!key) return {};
+    const auto locale = g_active.load(); // own the entire formatting operation
+    const auto alias = locale->legacy.find(key);
+    const wchar_t* source = alias != locale->legacy.end() && localization::PrintfMatches(key, alias->second) ? alias->second.c_str() : key;
+    const std::wstring* translated = Find(*locale, key, nullptr);
+    const wchar_t* format = translated && localization::PrintfMatches(source, *translated) ? translated->c_str() : source;
+    if (!localization::PrintfTokens(format)) return key;
     va_list args;
     va_start(args, key);
     const int length = _vscwprintf(format, args);
     va_end(args);
-    if (length <= 0)
-        return std::wstring(format);
+    if (length < 0 || length > 1024 * 1024) return key;
+    if (length == 0) return {};
     std::wstring text(size_t(length), L'\0');
     va_start(args, key);
     vswprintf_s(text.data(), text.size() + 1, format, args);
@@ -227,7 +251,9 @@ std::wstring TrPlural(const wchar_t* key, int count, const wchar_t* context)
     if (!key)
         return {};
     const auto locale = g_active.load();
-    std::wstring qualified(key);
+    const auto alias = locale->legacy.find(key);
+    const wchar_t* source = alias != locale->legacy.end() && localization::CountMatches(key, alias->second) ? alias->second.c_str() : key;
+    std::wstring qualified(source);
     if (context && *context) {
         qualified += L'#';
         qualified += context;
@@ -246,7 +272,7 @@ std::wstring TrPlural(const wchar_t* key, int count, const wchar_t* context)
     };
     const auto* forms = findPlural(qualified);
     if (!forms)
-        forms = findPlural(key);
+        forms = findPlural(source);
     std::wstring text;
     if (forms) {
         const auto one = forms->find(L"one");
@@ -255,15 +281,13 @@ std::wstring TrPlural(const wchar_t* key, int count, const wchar_t* context)
             text = one->second;
         else if (other != forms->end())
             text = other->second;
-        else if (one != forms->end())
-            text = one->second;
     }
-    if (text.empty())
-        text = Tr(key, context);
-    const std::wstring number = std::to_wstring(count);
-    if (const size_t at = text.find(L"{0}"); at != std::wstring::npos)
-        text.replace(at, 3, number);
-    return text;
+    if (text.empty()) {
+        const auto* fallback = Find(*locale, key, context);
+        text = fallback ? *fallback : key;
+    }
+    if (!localization::CountMatches(source, text)) text = source;
+    return localization::SubstituteCount(text, count);
 }
 
 } // namespace atrium

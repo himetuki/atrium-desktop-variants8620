@@ -46,3 +46,6 @@ target_include_directories(localization_tests PRIVATE ../core)
 target_compile_definitions(localization_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(localization_tests PRIVATE windowsapp)
 add_test(NAME localization COMMAND localization_tests)
+add_custom_command(TARGET localization_tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/../locales" "$<TARGET_FILE_DIR:localization_tests>/locales"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/../tests/fixtures/locales" "$<TARGET_FILE_DIR:localization_tests>/locales")

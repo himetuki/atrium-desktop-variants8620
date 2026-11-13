@@ -1,156 +1,121 @@
-# Fails when an English source key has no entry in a locale file, a key is
-# duplicated, or a format placeholder differs between English and a locale.
-# Only static literals are checked; dynamic keys (Loc.T(name)) are not.
-$ErrorActionPreference = "Stop"
-$root = Split-Path -Parent $PSScriptRoot
+# Static resource checks. Dynamic OS/data names use locales/legacy.json.
+param([string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot))
+$ErrorActionPreference = 'Stop'
+$root = $ProjectRoot
 $errors = [System.Collections.Generic.List[string]]::new()
-
-function Read-Text([string]$path) {
-    Get-Content -LiteralPath $path -Raw -Encoding utf8
+if (-not ('Atrium.Settings.LocalizationValidation' -as [type])) {
+    Add-Type -Path (Join-Path $PSScriptRoot '../settings/Atrium.Settings/LocalizationValidation.cs')
 }
 
-function Line-Of([string]$text, [int]$index) {
-    ($text.Substring(0, $index) -split "`n").Count
+function Read-Json([string]$path) {
+    try {
+        $text = Get-Content -LiteralPath $path -Raw -Encoding utf8
+        $duplicates = [Atrium.Settings.LocalizationValidation]::DuplicateKeys($text)
+        foreach ($duplicate in $duplicates) { $errors.Add("${path}: duplicate key $duplicate") }
+        if ($duplicates.Count) { return $null }
+        return ($text | ConvertFrom-Json -AsHashtable)
+    } catch { $errors.Add("${path}: invalid JSON: $($_.Exception.Message)"); return $null }
 }
 
-function Unescaped([string]$text) {
-    try { [regex]::Unescape($text) } catch { $text }
-}
-
-function Native-Placeholders([string]$text) {
-    (@([regex]::Matches($text, '%[-+0-9.#]*[diufegsxX]') | ForEach-Object { $_.Value }) | Sort-Object) -join ','
-}
-
-function Managed-Placeholders([string]$text) {
-    (@([regex]::Matches($text, '\{(\d+)(?:[^}]*)\}') | ForEach-Object { $_.Groups[1].Value }) |
-        Sort-Object { [int]$_ }) -join ','
-}
-
-function Check-Calls {
-    param(
-        [string]$Label,
-        [string]$Path,
-        [string]$Pattern,
-        [hashtable]$Table,
-        [string]$PlaceholderKind
-    )
-    $text = Read-Text $Path
-    foreach ($match in [regex]::Matches($text, $Pattern)) {
-        $key = Unescaped $match.Groups[1].Value
-        if (-not $Table.ContainsKey($key)) {
-            $line = Line-Of $text $match.Index
-            $errors.Add("${Label}: ${Path}:${line}: missing locale entry for `"$key`"")
+$localeDir = Join-Path $root 'locales'
+$manifest = Read-Json (Join-Path $localeDir 'manifest.json')
+$localeFiles = [System.Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
+$tags = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+if (-not $manifest -or $manifest['source'] -ne 'en' -or -not $manifest['languages']) {
+    $errors.Add('manifest.json must declare English source keys and a language list.')
+} else {
+    foreach ($language in $manifest['languages']) {
+        $tag = [string]$language['tag']
+        if (-not [Atrium.Settings.LocalizationValidation]::ValidTag($tag) -or -not $tags.Add($tag)) {
+            $errors.Add("manifest: invalid or duplicate language tag '$tag'")
             continue
         }
-        $english = $key
-        $localized = $Table[$key]
-        if ($localized -is [hashtable]) {
-            $localized = if ($localized.ContainsKey('other')) { $localized['other'] } else { $localized.Values | Select-Object -First 1 }
-        }
-        if ($localized -isnot [string]) { continue }
-        if ($PlaceholderKind -eq "native") {
-            if ((Native-Placeholders $english) -ne (Native-Placeholders $localized)) {
-                $line = Line-Of $text $match.Index
-                $errors.Add("${Label}: ${Path}:${line}: placeholder mismatch for `"$key`" -> `"$localized`"")
-            }
-        } else {
-            if ((Managed-Placeholders $english) -ne (Managed-Placeholders $localized)) {
-                $line = Line-Of $text $match.Index
-                $errors.Add("${Label}: ${Path}:${line}: placeholder mismatch for `"$key`" -> `"$localized`"")
-            }
-        }
+        if ($tag -eq 'en') { continue }
+        $path = Join-Path $localeDir ($tag + '.json')
+        $json = Read-Json $path
+        if ($json -and $json['strings'] -is [System.Collections.IDictionary]) { $localeFiles[$tag] = $json['strings'] }
+        else { $errors.Add("${path}: missing strings object") }
     }
+    if (-not $tags.Contains('en')) { $errors.Add('manifest: missing source language en') }
 }
+if (Test-Path (Join-Path $localeDir 'legacy.json')) { $null = Read-Json (Join-Path $localeDir 'legacy.json') }
 
-# --- locale files -----------------------------------------------------------
-$localeDir = Join-Path $root "locales"
-$manifest = Read-Text (Join-Path $localeDir "manifest.json") | ConvertFrom-Json -AsHashtable
-$localeFiles = @{}
-foreach ($language in $manifest.languages) {
-    if ($language.tag -eq 'en') { continue } # English is the source key itself
-    $path = Join-Path $localeDir ($language.tag + ".json")
-    if (-not (Test-Path $path)) {
-        $errors.Add("locale: missing file for $($language.tag): $path")
-        continue
-    }
-    $json = Read-Text $path | ConvertFrom-Json -AsHashtable
-    $localeFiles[$language.tag] = $json.strings
+$sourceKeys = [System.Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+function Add-Key([string]$key, [string]$kind) {
+    if (-not $sourceKeys.ContainsKey($key)) { $sourceKeys[$key] = [System.Collections.Generic.HashSet[string]]::new() }
+    [void]$sourceKeys[$key].Add($kind)
 }
+function Unescaped([string]$text) { try { [regex]::Unescape($text) } catch { $text } }
 
-# The source language (English) is the key itself. Check every complete locale
-# against the source keys found in code and XAML.
-$sourceKeys = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-$nativeFiles = Get-ChildItem (Join-Path $root "native/core") -Recurse -File -Include *.cpp, *.h |
-    Where-Object { $_.Name -ne "localization.cpp" }
+$nativeFiles = Get-ChildItem (Join-Path $root 'native/core') -Recurse -File -Include *.cpp,*.h |
+    Where-Object Name -ne 'localization.cpp'
 foreach ($file in $nativeFiles) {
-    $text = Read-Text $file.FullName
-    foreach ($match in [regex]::Matches($text, '\bTr(?:Format|Plural)?\s*\(\s*L"((?:[^"\\]|\\.)*)"')) {
-        [void]$sourceKeys.Add((Unescaped $match.Groups[1].Value))
+    $text = Get-Content -LiteralPath $file.FullName -Raw -Encoding utf8
+    foreach ($match in [regex]::Matches($text, '\b(Tr(?:Format|Plural)?)\s*\(\s*L"((?:[^"\\]|\\.)*)"')) {
+        $kind = switch ($match.Groups[1].Value) { 'TrFormat' {'native'} 'TrPlural' {'managed'} default {'raw'} }
+        Add-Key (Unescaped $match.Groups[2].Value) $kind
     }
 }
-$settingsFiles = Get-ChildItem (Join-Path $root "settings/Atrium.Settings") -File -Filter *.cs |
-    Where-Object { $_.Name -ne "Loc.cs" }
+$settingsFiles = Get-ChildItem (Join-Path $root 'settings/Atrium.Settings') -File -Filter *.cs |
+    Where-Object Name -ne 'Loc.cs'
 foreach ($file in $settingsFiles) {
-    $text = Read-Text $file.FullName
-    foreach ($match in [regex]::Matches($text, '\bLoc\.(?:T|F|Plural)\s*\(\s*"((?:[^"\\]|\\.)*)"')) {
-        [void]$sourceKeys.Add((Unescaped $match.Groups[1].Value))
+    $text = Get-Content -LiteralPath $file.FullName -Raw -Encoding utf8
+    foreach ($match in [regex]::Matches($text, '\bLoc\.(T|F|Plural)\s*\(\s*"((?:[^"\\]|\\.)*)"')) {
+        $kind = if ($match.Groups[1].Value -eq 'T') { 'raw' } else { 'managed' }
+        Add-Key (Unescaped $match.Groups[2].Value) $kind
     }
 }
-$xamlFiles = Get-ChildItem (Join-Path $root "settings/Atrium.Settings") -File -Filter *.xaml
-foreach ($file in $xamlFiles) {
-    $text = Read-Text $file.FullName
-    $pattern = '(?:Text|Title|Note|Content|SwitchName|Header|PlaceholderText|AutomationProperties\.Name|ToolTipService\.ToolTip)="([^"]*[A-Za-z][^"]*)"'
-    foreach ($match in [regex]::Matches($text, $pattern)) {
-        $value = $match.Groups[1].Value
-        if ($value.StartsWith('{')) { continue }
-        [void]$sourceKeys.Add($value)
+foreach ($file in (Get-ChildItem (Join-Path $root 'settings/Atrium.Settings') -File -Filter *.xaml)) {
+    $text = Get-Content -LiteralPath $file.FullName -Raw -Encoding utf8
+    foreach ($match in [regex]::Matches($text, '(?:Text|Title|Note|Content|SwitchName|Header|PlaceholderText|AutomationProperties\.Name|ToolTipService\.ToolTip)="([^"]*[A-Za-z][^"]*)"')) {
+        $value = [System.Net.WebUtility]::HtmlDecode($match.Groups[1].Value)
+        if (-not $value.StartsWith('{')) { Add-Key $value 'raw' }
     }
 }
 
-foreach ($tag in $localeFiles.Keys) {
-    $table = $localeFiles[$tag]
-    foreach ($key in $sourceKeys) {
-        if (-not $table.ContainsKey($key)) {
-            $errors.Add("locale ${tag}: missing key `"$key`"")
-            continue
+foreach ($locale in $localeFiles.GetEnumerator()) {
+    $tag = $locale.Key
+    $table = $locale.Value
+    foreach ($source in $sourceKeys.GetEnumerator()) {
+        $key = $source.Key
+        if (-not $table.Contains($key)) { $errors.Add("locale ${tag}: missing key '$key'") }
+    }
+    foreach ($translation in $table.GetEnumerator()) {
+        $key = $translation.Key
+        $baseKey = $key
+        if (-not $sourceKeys.ContainsKey($baseKey)) {
+            $contextAt = $key.LastIndexOf('#')
+            if ($contextAt -ge 0) { $baseKey = $key.Substring(0, $contextAt) }
         }
-        $localized = $table[$key]
-        if ($localized -is [hashtable]) {
-            $localized = if ($localized.ContainsKey('other')) { $localized['other'] } else { $localized.Values | Select-Object -First 1 }
+        $kinds = if ($sourceKeys.ContainsKey($baseKey)) { $sourceKeys[$baseKey] } else { @() }
+        $entry = $translation.Value
+        $plural = $entry -is [System.Collections.IDictionary]
+        if ($plural -and (-not $entry.Contains('other') -or [string]::IsNullOrEmpty([string]$entry['other']))) {
+            $errors.Add("locale ${tag}: plural '$key' must contain an other form")
         }
-        if ($localized -isnot [string]) { continue }
-        if ((Managed-Placeholders $key) -ne (Managed-Placeholders $localized)) {
-            $errors.Add("locale ${tag}: placeholder mismatch for `"$key`" -> `"$localized`"")
+        $forms = if ($plural) { @($entry.GetEnumerator() | ForEach-Object Key) } else { @('text') }
+        foreach ($form in $forms) {
+            $value = if ($plural) { $entry[$form] } else { $entry }
+            if ($value -isnot [string] -or [string]::IsNullOrEmpty($value) -or $value.Contains([char]0)) {
+                $errors.Add("locale ${tag}: '$key' ($form) must be a nonempty string")
+                continue
+            }
+            if ($kinds -contains 'native' -and -not [Atrium.Settings.LocalizationValidation]::NativeMatches($baseKey, $value)) {
+                $errors.Add("locale ${tag}: native placeholder mismatch for '$key' ($form)")
+            }
+            if ($plural -and -not [Atrium.Settings.LocalizationValidation]::CountMatches($baseKey, $value)) {
+                $errors.Add("locale ${tag}: count placeholder mismatch for '$key' ($form)")
+            }
+            if ($kinds -contains 'managed' -and -not [Atrium.Settings.LocalizationValidation]::ManagedMatches($baseKey, $value)) {
+                $errors.Add("locale ${tag}: managed placeholder mismatch for '$key' ($form)")
+            }
         }
     }
 }
-
-# Call sites also need checking for placeholders against the locale text.
-foreach ($file in $nativeFiles) {
-    Check-Calls -Label "native" -Path $file.FullName -Pattern '\bTr(?:Format|Plural)?\s*\(\s*L"((?:[^"\\]|\\.)*)"' `
-        -Table $localeFiles['zh-Hans'] -PlaceholderKind "native"
-}
-foreach ($file in $settingsFiles) {
-    Check-Calls -Label "settings" -Path $file.FullName -Pattern '\bLoc\.(?:T|F|Plural)\s*\(\s*"((?:[^"\\]|\\.)*)"' `
-        -Table $localeFiles['zh-Hans'] -PlaceholderKind "settings"
-}
-
-# Duplicate keys in a JSON file would silently keep only one value.
-foreach ($tag in $localeFiles.Keys) {
-    $path = Join-Path $localeDir ($tag + ".json")
-    $raw = Read-Text $path
-    $seen = @{}
-    foreach ($match in [regex]::Matches($raw, '"((?:[^"\\]|\\.)*)"\s*:')) {
-        $key = $match.Groups[1].Value
-        if ($key -in @('schema', 'language', 'strings')) { continue }
-        if ($seen.ContainsKey($key)) { $errors.Add("locale ${tag}: duplicate key `"$key`"") }
-        $seen[$key] = $true
-    }
-}
-
-if ($errors.Count -gt 0) {
+if ($errors.Count) {
     foreach ($message in $errors) { Write-Host "ERROR: $message" }
     Write-Host "Localization check failed ($($errors.Count) error(s))."
     exit 1
 }
-Write-Host "Localization check passed: $($sourceKeys.Count) source keys, $($localeFiles['zh-Hans'].Count) zh-Hans entries."
+Write-Host "Localization check passed: $($sourceKeys.psbase.Count) source keys, $($localeFiles.psbase.Count) translated language(s)."
+exit 0

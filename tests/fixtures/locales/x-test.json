@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "language": "x-test",
+  "strings": {
+    "Open": "Aç",
+    "open": "lowercase",
+    "Open#menu": "Menüyü aç",
+    "Read %s: %lu": "%lu %s",
+    "Count %d": "BAD %n",
+    "Amount %.0f": "%.1000000f",
+    "Stars %*.*f": "%f",
+    "Value {0}": "WRONG {1}",
+    "Date {0}": "{0:Q}",
+    "{0} + {1}": "{1} et {0}",
+    "Empty": "",
+    "Nul": "\u0000hidden",
+    "{0} files": {"one": "ONE {0}", "other": "OTHER {0}"},
+    "{0} files#menu": {"one": "MENU ONE {0}", "other": "MENU OTHER {0}"},
+    "{0} and {0}": {"one": "{0} / {0}", "other": "{0} / {0}"},
+    "{{{0}}} files": {"other": "{{{0}}} test"},
+    "{0} bad": {"one": "{1}", "other": "{1}"},
+    "{0} incomplete": {"one": "ONE {0}"}
+  }
+}
