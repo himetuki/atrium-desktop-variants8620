@@ -82,16 +82,15 @@ public:
     // the shell's own show-hook must not hide them again in between. Reveal
     // shows them (no-op flags otherwise), Conceal hides them back only when
     // Atrium had hidden them.
-    static void RevealForClick();
+    static bool RevealForClick(); // false once exit restoration has started
     static void ConcealAfterClick();
 
 private:
-    void HideTaskbars();
+    static void HideTaskbars();
     void Watch();
     void Save() const;
     static void CALLBACK OnShow(HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWORD);
 
-    std::atomic_bool taskbarHidden_ = false; // also cleared by a crashing worker
     std::atomic_bool autoHideOurs_ = false; // Atrium switched the taskbar to auto-hide
     bool bannersHidden_ = false; // the setting asks for no system banners
     bool quietReady_ = false;    // Do Not Disturb is alarms-only (ours or already)
@@ -100,7 +99,6 @@ private:
     bool autoPlayBannerOurs_ = false; // Atrium turned the AutoPlay banners off; restore them
     bool autoPlayBannerReady_ = false; // AutoPlay banners are off (ours or already)
     bool exiting_ = false;
-    static std::atomic_bool suppressHide_; // a tray-icon click has the taskbars shown for a moment
     HWINEVENTHOOK hook_ = nullptr;
     DWORD hookedPid_ = 0;
 };

@@ -2,6 +2,7 @@
 
 #include "log.h"
 #include "shell/system_chrome.h"
+#include "shell/tray_pointer.h"
 
 #include <shellapi.h>
 #include <shlobj.h>
@@ -333,6 +334,7 @@ int Score(const std::wstring& tipKey, const std::wstring& candidate)
 
 struct Found {
     winrt::com_ptr<IUIAutomationElement> element;
+    HWND host = nullptr; // actual XAML host: taskbar or the separate overflow popup
     HWND toolbar = nullptr; // a button of the classic tray's toolbar (Windows 10): clicked by messages to it
     std::wstring tip;
     bool promoted;
@@ -384,6 +386,7 @@ std::vector<Found> FindButtons(IUIAutomation* uia, bool& available)
         all->get_Length(&n);
         for (int i = 0; i < n; ++i) {
             Found f;
+            f.host = host;
             all->GetElement(i, f.element.put());
             BSTR name = nullptr;
             if (f.element)
@@ -443,12 +446,14 @@ std::vector<Found> FindButtons(IUIAutomation* uia, bool& available)
 }
 
 // Only on an explicit icon action: let Explorer create its lazy overflow,
-// then collapse it again. Reading icons never opens or focuses the system tray.
-bool PrepareOverflow(IUIAutomation* uia)
+// then collapse it again unless a real right click needs it kept visible.
+// Reading icons never opens or focuses the system tray.
+bool PrepareOverflow(IUIAutomation* uia, bool keepVisible = false)
 {
     HWND host = FindWindowW(L"Shell_TrayWnd", nullptr);
     HWND overflow = FindWindowW(L"TopLevelWindowForOverflowXamlIsland", nullptr);
-    if (!host || (overflow && IsWindowVisible(overflow))) return false;
+    if (!host) return false;
+    if (overflow && IsWindowVisible(overflow)) return true;
     winrt::com_ptr<IUIAutomationElement> root, chevron;
     winrt::com_ptr<IUIAutomationCondition> cond, automationId, button;
     HWND bridge = FindWindowExW(host, nullptr, L"Windows.UI.Composition.DesktopWindowContentBridge", nullptr);
@@ -475,11 +480,12 @@ bool PrepareOverflow(IUIAutomation* uia)
         overflow = FindWindowW(L"TopLevelWindowForOverflowXamlIsland", nullptr);
         bool available = false;
         auto buttons = FindButtons(uia, available);
-        ready = std::any_of(buttons.begin(), buttons.end(), [](const Found& f) { return !f.promoted && f.element; });
+        ready = (!keepVisible || (overflow && IsWindowVisible(overflow))) &&
+            std::any_of(buttons.begin(), buttons.end(), [](const Found& f) { return !f.promoted && f.element; });
         if (ready) break;
         Sleep(20);
     }
-    if (overflow && IsWindowVisible(overflow)) invoke->Invoke();
+    if (!keepVisible && overflow && IsWindowVisible(overflow)) invoke->Invoke();
     return ready;
 }
 
@@ -782,50 +788,110 @@ bool ActivateWindowOf(const std::wstring& exe)
     AllowSetForegroundWindow(ASFW_ANY);
     if (IsIconic(m.window))
         ShowWindow(m.window, SW_RESTORE);
-    SetForegroundWindow(m.window);
-    return true;
+    return SetForegroundWindow(m.window) != FALSE;
 }
 
-// A right click on a XAML tray button opens the program's own menu only when a
-// real mouse click lands on it: UI Automation's ShowContextMenu almost never
-// reaches the icon's handler. The taskbars are shown for the moment of the
-// click, then hidden again; their position is what the bounds already say.
-// The input goes out only when the pointer really is over the shell's taskbar:
-// with the bar mid-slide-in, or anything of ours under the point, nothing is sent.
-bool RealTrayClick(const RECT& at)
-{
-    HWND tray = FindWindowW(L"Shell_TrayWnd", nullptr);
-    if (!tray || IsRectEmpty(&at))
-        return false;
-    const POINT p{(at.left + at.right) / 2, (at.top + at.bottom) / 2};
-    RECT on{};
-    GetWindowRect(tray, &on);
-    if (!PtInRect(&on, p))
-        return false;
-    POINT was{};
-    if (!GetCursorPos(&was))
-        return false;
-    SystemChrome::RevealForClick();
-    bool clicked = false;
-    if (IsWindowVisible(tray) && SetCursorPos(p.x, p.y)) {
-        Sleep(60); // the shell notices the pointer on its bar
-        HWND under = WindowFromPoint(p);
-        if (!under || (GetAncestor(under, GA_ROOT) != tray && !IsChild(tray, under))) {
-            SetCursorPos(was.x, was.y); // off the bar: send nothing, anywhere
-        } else {
-            INPUT in[2]{};
-            in[0].type = INPUT_MOUSE;
-            in[0].mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
-            in[1].type = INPUT_MOUSE;
-            in[1].mi.dwFlags = MOUSEEVENTF_RIGHTUP;
-            clicked = SendInput(2, in, sizeof(INPUT)) == 2;
-            SetCursorPos(was.x, was.y); // the pointer goes home at once
-            Sleep(180); // the menu opens before the bars hide again
-        }
+namespace {
+
+struct TaskbarClickReveal {
+    bool active = SystemChrome::RevealForClick();
+    ~TaskbarClickReveal() { if (active) SystemChrome::ConcealAfterClick(); }
+};
+
+struct OverflowClickReveal {
+    HWND opened = nullptr;
+    bool ready = true;
+    OverflowClickReveal(IUIAutomation* uia, bool needed)
+    {
+        if (!needed) return;
+        HWND before = FindWindowW(L"TopLevelWindowForOverflowXamlIsland", nullptr);
+        const bool visible = before && IsWindowVisible(before);
+        ready = PrepareOverflow(uia, true);
+        if (!visible)
+            opened = FindWindowW(L"TopLevelWindowForOverflowXamlIsland", nullptr);
     }
-    SystemChrome::ConcealAfterClick();
-    return clicked;
+    ~OverflowClickReveal()
+    {
+        // Do not invoke the chevron again: that is another activation and can
+        // dismiss the application's newly opened menu. Leave pre-existing UI alone.
+        if (opened && IsWindow(opened)) ShowWindowAsync(opened, SW_HIDE);
+    }
+};
+
+struct TrayPointerDesktop {
+    IUIAutomation* uia;
+    IUIAutomationElement* element;
+    HWND host;
+
+    bool Cursor(POINT& p) const { return GetCursorPos(&p) != FALSE; }
+    bool Move(POINT p) const { return SetCursorPos(p.x, p.y) != FALSE; }
+    void Wait(DWORD ms) const { Sleep(ms); }
+    bool Interacting() const
+    {
+        for (int key : {VK_LBUTTON, VK_RBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2,
+                        VK_SHIFT, VK_CONTROL, VK_MENU, VK_LWIN, VK_RWIN})
+            if (GetAsyncKeyState(key) & 0x8000) return true;
+        return false;
+    }
+    bool Target(POINT& p) const
+    {
+        RECT bounds{}, on{};
+        if (!element || !host || !IsWindowVisible(host) ||
+            FAILED(element->get_CurrentBoundingRectangle(&bounds)) || IsRectEmpty(&bounds) ||
+            !GetWindowRect(host, &on))
+            return false;
+        p = {bounds.left + (bounds.right - bounds.left) / 2, bounds.top + (bounds.bottom - bounds.top) / 2};
+        return PtInRect(&on, p) && MonitorFromPoint(p, MONITOR_DEFAULTTONULL);
+    }
+    bool TargetAt(POINT p) const
+    {
+        HWND under = WindowFromPoint(p);
+        if (!under || (GetAncestor(under, GA_ROOT) != host && !IsChild(host, under)))
+            return false;
+        winrt::com_ptr<IUIAutomationElement> hit;
+        winrt::com_ptr<IUIAutomationTreeWalker> walker;
+        if (FAILED(uia->ElementFromPoint(p, hit.put())) || !hit ||
+            FAILED(uia->get_RawViewWalker(walker.put())) || !walker)
+            return false;
+        // The point can hit the icon's image/text child, but must resolve to
+        // this exact live button, not merely any window of Explorer's taskbar.
+        for (int depth = 0; hit && depth < 12; ++depth) {
+            BOOL same = FALSE;
+            if (SUCCEEDED(uia->CompareElements(element, hit.get(), &same)) && same)
+                return true;
+            winrt::com_ptr<IUIAutomationElement> parent;
+            if (FAILED(walker->GetParentElement(hit.get(), parent.put()))) break;
+            hit = std::move(parent);
+        }
+        return false;
+    }
+    bool Send(POINT p) const
+    {
+        const LONG x = GetSystemMetrics(SM_XVIRTUALSCREEN), y = GetSystemMetrics(SM_YVIRTUALSCREEN);
+        const RECT desktop{x, y, x + GetSystemMetrics(SM_CXVIRTUALSCREEN), y + GetSystemMetrics(SM_CYVIRTUALSCREEN)};
+        std::array<INPUT, 3> input{};
+        if (!tray::RightClickInputs(p, desktop, input)) return false;
+        const UINT sent = SendInput(UINT(input.size()), input.data(), sizeof(INPUT));
+        if (sent == 2) {
+            // Position + down were inserted, but the release was not. Do not
+            // leave the user's right button stuck down after partial failure.
+            INPUT release{};
+            release.type = INPUT_MOUSE;
+            release.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
+            SendInput(1, &release, sizeof(INPUT));
+        }
+        return sent == input.size();
+    }
+};
+
+HRESULT RealTrayClick(IUIAutomation* uia, const Found& target)
+{
+    TrayPointerDesktop desktop{uia, target.element.get(), target.host};
+    const auto result = tray::RightClick(desktop);
+    return result == tray::PointerClick::sent ? S_OK : result == tray::PointerClick::cancelled ? E_ABORT : E_FAIL;
 }
+
+} // namespace
 
 std::wstring TrayModel::Title(const std::wstring& tip)
 {
@@ -1016,10 +1082,26 @@ void TrayModel::Worker()
                     }
                 } else if (it != buttons.end() && it->element) {
                     if (job.right) {
-                        // The program's own menu: only a real click gives it.
-                        if (RealTrayClick(it->bounds))
-                            hr = S_OK;
-                        else {
+                        // Opening overflow can materialise/reorder its buttons;
+                        // reacquire this icon after showing the actual host.
+                        auto click = [&]() -> HRESULT {
+                            auto selected = it->element;
+                            TaskbarClickReveal reveal;
+                            if (!reveal.active) return E_ABORT;
+                            OverflowClickReveal overflow(uia.get(), !job.icon.promoted);
+                            if (!overflow.ready) return E_FAIL;
+                            buttons = FindButtons(uia.get(), available);
+                            // Keep the selected UIA identity across layout changes.
+                            // A title/order fallback here could hit a different icon.
+                            it = std::find_if(buttons.begin(), buttons.end(), [&](const Found& f) {
+                                BOOL same = FALSE;
+                                return f.element && SUCCEEDED(uia->CompareElements(selected.get(), f.element.get(), &same)) && same;
+                            });
+                            if (it == buttons.end()) return E_ABORT;
+                            return RealTrayClick(uia.get(), *it);
+                        };
+                        hr = click();
+                        if (FAILED(hr) && hr != E_ABORT && it != buttons.end() && it->element) {
                             winrt::com_ptr<IUIAutomationElement3> e3 = it->element.try_as<IUIAutomationElement3>();
                             hr = e3 ? e3->ShowContextMenu() : E_NOINTERFACE;
                         }

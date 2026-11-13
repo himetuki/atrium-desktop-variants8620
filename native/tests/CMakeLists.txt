@@ -23,6 +23,13 @@ add_executable(double_click_tests
 target_include_directories(double_click_tests PRIVATE ../core)
 add_test(NAME double_click COMMAND double_click_tests)
 
+add_executable(tray_interaction_tests tray_interaction.cpp)
+target_include_directories(tray_interaction_tests PRIVATE ../core)
+target_compile_definitions(tray_interaction_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(tray_interaction_tests PRIVATE user32)
+add_test(NAME tray_interaction COMMAND tray_interaction_tests)
+set_tests_properties(tray_interaction PROPERTIES TIMEOUT 20)
+
 add_executable(quiet_profile_tests quiet_profile.cpp)
 target_include_directories(quiet_profile_tests PRIVATE ../core)
 target_compile_definitions(quiet_profile_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
