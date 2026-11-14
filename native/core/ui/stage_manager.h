@@ -21,6 +21,9 @@
 
 #include "motion.h"
 #include "shell/task_model.h"
+#include "ui/stage_scroll.h"
+#include "ui/stage_open.h"
+#include "ui/stage_excluded.h"
 #include "ui/surface.h"
 #include "ui/window_snapshot.h"
 
@@ -44,6 +47,10 @@ public:
 
     void SetEnabled(bool on);
     bool Enabled() const { return enabled_; }
+    // Apps Stage Manager leaves alone (screenshot tools and anything the user lists).
+    void SetExcluded(std::vector<std::wstring> apps);
+    bool Excluded(const std::wstring& app) const { return StageAppExcluded(excluded_, app); }
+    void OpenInCurrentGroup(const std::wstring& app);
     void SetOnRight(bool onRight);
     void SetAutoHide(bool autoHide);
     // A window minimized on the stage goes to the strip (setting stageMinimize), on a card of its own.
@@ -103,7 +110,7 @@ private:
     void Stage(const Set& keys, bool add, HWND front, bool activate, const std::unordered_map<HWND, Pose>* fly = nullptr);
     void Park(HWND window, const std::wstring& key);
     void Unpark(const Set& keys, HWND front, bool activate, const std::unordered_map<HWND, Pose>* fly = nullptr);
-    void Pick(const Set& keys, bool add);
+    void Pick(const Set& keys, bool add, HWND front = nullptr);
     void PictureTaken();       // WM_STAGE_PICTURE
     void Launch();             // the flight layer, up for a flight
     void Foresee();            // pictures of the stage's windows, ahead of a pick
@@ -122,7 +129,7 @@ private:
     int Capacity() const;
 
     // The strip.
-    void Rebuild();
+    void Rebuild(bool keepAnchor = true);
     void Layout();
     void Show();
     void Hide();
@@ -172,6 +179,8 @@ private:
     uint64_t seq_ = 0;
     Set pending_;                      // picked in the strip, not in front yet
     ULONGLONG pendingUntil_ = 0;
+    StageOpenIntent openIntent_;
+    std::vector<std::wstring> excluded_ = DefaultStageExcluded();
 
     std::vector<Entry> entries_;
     std::vector<Entry> leaving_;       // cards fading out (picked, or their windows gone)
@@ -181,6 +190,8 @@ private:
     RECT rect_{};                      // the strip, screen px: room for Capacity() cards
     D2D1_SIZE_F size_{};               // DIP
     int hover_ = -1, pressed_ = -1;
+    StageScroll scroll_;
+    size_t scrollCount_ = 0;
     bool tracking_ = false, inside_ = false;
     // Out (or on its way out) of the screen's edge; the cards slide out one after the other.
     bool shown_ = false;

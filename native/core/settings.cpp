@@ -143,6 +143,12 @@ std::wstring Settings::ToJson() const
     o.SetNamedValue(L"stageOnRight", json::JsonValue::CreateBooleanValue(stageOnRight));
     o.SetNamedValue(L"stageAutoHide", json::JsonValue::CreateBooleanValue(stageAutoHide));
     o.SetNamedValue(L"stageMinimize", json::JsonValue::CreateBooleanValue(stageMinimize));
+    {
+        json::JsonArray a;
+        for (const std::wstring& app : stageExcluded)
+            a.Append(json::JsonValue::CreateStringValue(app));
+        o.SetNamedValue(L"stageExcluded", a);
+    }
     o.SetNamedValue(L"hideTaskbar", json::JsonValue::CreateBooleanValue(hideTaskbar));
     o.SetNamedValue(L"hideBanners", json::JsonValue::CreateBooleanValue(hideBanners));
     o.SetNamedValue(L"remoteVisible", json::JsonValue::CreateBooleanValue(remoteVisible));
@@ -236,6 +242,13 @@ bool Settings::FromJson(const std::wstring& text, const Settings& base, Settings
     flag(L"stageMinimize", s.stageMinimize);
     flag(L"hideTaskbar", s.hideTaskbar);
     flag(L"hideBanners", s.hideBanners);
+    if (o.HasKey(L"stageExcluded") && o.GetNamedValue(L"stageExcluded").ValueType() == json::JsonValueType::Array) {
+        std::vector<std::wstring> apps;
+        for (const auto& v : o.GetNamedArray(L"stageExcluded"))
+            if (v.ValueType() == json::JsonValueType::String)
+                apps.push_back(std::wstring(v.GetString()));
+        s.stageExcluded = std::move(apps);
+    }
     flag(L"remoteVisible", s.remoteVisible);
     flag(L"winKeyStart", s.winKeyStart);
     flag(L"winNumbers", s.winNumbers);

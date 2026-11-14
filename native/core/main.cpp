@@ -76,7 +76,7 @@ constexpr UINT kTrayId = 1;
 
 enum Command : UINT {
     kCmdSettings = 100, kCmdToggle, kCmdExit, kCmdNewWindow, kCmdPin, kCmdUnpin, kCmdClose, kCmdOpenLocation, kCmdDesktop, kCmdTaskManager, kCmdTerminate, kCmdTerminateConfirm,
-    kCmdWidgets, kCmdStage, kCmdWidgetsModule, kCmdRunAs, kCmdProperties,
+    kCmdWidgets, kCmdStage, kCmdWidgetsModule, kCmdStageAdd, kCmdRunAs, kCmdProperties,
     kCmdRecent = 2000 // + index into the recent list (its length is bounded)
 };
 
@@ -565,6 +565,7 @@ void ApplySettings(const Settings& s)
     g_app.stage->SetOnRight(s.stageOnRight);
     g_app.stage->SetAutoHide(s.stageAutoHide);
     g_app.stage->SetMinimizeToStrip(s.stageMinimize);
+    g_app.stage->SetExcluded(s.stageExcluded);
     g_app.stage->SetEnabled(s.stageManager);
     g_app.control->SetStage(s.stageManager, s.stageOnRight);
     g_app.widgets->SetMaterial(s.widgetMaterial == L"dusk" ? WidgetMaterial::Dusk : s.widgetMaterial == L"color" ? WidgetMaterial::Color : WidgetMaterial::Glass);
@@ -778,6 +779,10 @@ void ShowItemMenu(const std::wstring& key, POINT pt)
 
     std::vector<MenuEntry> entries = {{it->name, 0, false, false, true}, {L"", 0}};
     entries.push_back({it->windows.empty() || !it->multipleWindows ? Tr(L"Open") : Tr(L"Open New Window"), kCmdNewWindow});
+    // Always offered for managed apps: with Stage on it adds to the current group; with Stage off
+    // it opens the app. Excluded apps keep only their ordinary Open row.
+    if (g_app.stage && !g_app.stage->Excluded(key))
+        entries.push_back({Tr(L"Open / Add to Current Group"), kCmdStageAdd});
     size_t command = 0;
     for (auto& [title, rows] : sections) {
         if (rows.empty())
@@ -817,6 +822,12 @@ void ShowItemMenu(const std::wstring& key, POINT pt)
         switch (cmd) {
         case kCmdNewWindow:
             g_app.tasks->Launch(key);
+            break;
+        case kCmdStageAdd:
+            if (g_app.stage && g_app.stage->Enabled())
+                g_app.stage->OpenInCurrentGroup(key);
+            else
+                g_app.tasks->Activate(key); // no group to add to: the same row opens the app
             break;
         case kCmdPin: {
             PinnedApp pin = g_app.tasks->PinFor(key);

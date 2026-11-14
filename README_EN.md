@@ -108,7 +108,14 @@ Three materials: the clear glass **like the taskbar**; **dusk**, the same glass 
   </tr>
 </table>
 
-The app you are using stays in the middle of the screen; the others move to one side, their windows standing at an angle in a column, one card per window, even for several windows of one app. Hover one and it turns to face you; click to bring it to the front, or Shift-click to group apps together. The side can always show (a window over it moves aside when it comes to the front; a maximized window sends it away until the pointer reaches the screen's edge), or slide out only when the pointer reaches the screen's edge. With “minimize windows to Stage Manager” on, minimizing the app in front sends its window's picture flying into the side instead of down to the taskbar. Turning Stage Manager off or quitting Atrium puts every window back.
+The app you are using stays in the middle of the screen; the others move to one side, their windows standing at an angle in a column, one card per window, even for several windows of one app. Hover one and it turns to face you; click to bring it to the front, or Shift-click to group apps together. The side can always show (a window over it moves aside when it comes to the front; a maximized window sends it away until the pointer reaches the screen's edge), or slide out only when the pointer reaches the screen's edge. With “minimize windows to Stage Manager” on, minimizing the app in front sends its window's picture flying into the side instead of down to the taskbar. The Windows Snipping Tool is left out of Stage Manager by default, so its overlay and pause/stop controls stay on screen while recording; add other apps in Settings. Turning Stage Manager off or quitting Atrium puts every window back.
+
+Additional strip controls:
+
+| Input | Behaviour |
+| --- | --- |
+| Vertical or horizontal wheel / touchpad scroll | Cycle through the complete strip, wrapping at either end. Precision deltas accumulate; scrolling does not activate a window. |
+| Taskbar app menu → Open / Add to Current Group | Always available for apps that are not excluded. With Stage Manager on, existing windows join the group and an app without a window joins after opening; with it off, the row simply opens the app. |
 
 ## Getting started
 

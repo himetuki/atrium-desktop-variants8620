@@ -835,6 +835,7 @@ public sealed partial class MainWindow : Window
         (_current.StageOnRight ? StageRight : StageLeft).IsChecked = true;
         (_current.StageAutoHide ? StageAutoHide : StageAlways).IsChecked = true;
         StageMinimizeSwitch.IsOn = _current.StageMinimize;
+        StageExcludedBox.Text = string.Join(Environment.NewLine, _current.StageExcluded);
         (_current.WidgetBackdrop == "wallpaper" ? BackdropWallpaper : BackdropDesktop).IsChecked = true;
         (_current.WidgetMaterial switch { "dusk" => MaterialDusk, "color" => MaterialColor, _ => MaterialGlass }).IsChecked = true;
         HideBannersSwitch.IsOn = _current.HideBanners;
@@ -1161,6 +1162,21 @@ public sealed partial class MainWindow : Window
         if (_loading) return;
         _current.StageMinimize = StageMinimizeSwitch.IsOn;
         Changed();
+    }
+
+    private void OnStageExcludedChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_loading) return;
+        _current.StageExcluded = StageExcludedBox.Text
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        Changed();
+    }
+
+    private void OnStageExcludedDefaults(object sender, RoutedEventArgs e)
+    {
+        StageExcludedBox.Text = string.Join(Environment.NewLine, BarSettings.StageExcludedDefaults);
     }
 
     private void OnWinKeyToggled(object sender, RoutedEventArgs e)

@@ -82,6 +82,14 @@ internal sealed class BarSettings
     public bool StageOnRight { get; set; }             // the strip's side; left by default (the widgets take the other side)
     public bool StageAutoHide { get; set; }            // the strip only comes out while the pointer rests on its edge
     public bool StageMinimize { get; set; }            // a window minimized on the stage goes to the strip (off unless chosen)
+    // Apps Stage Manager leaves alone; the default is the Windows Snipping Tool, whose overlay
+    // and control bar must stay on screen while recording. Other tools can be added.
+    // Keep in step with DefaultStageExcluded() in native/core/ui/stage_excluded.h.
+    public static readonly string[] StageExcludedDefaults =
+    {
+        "snippingtool.exe", "screenclippinghost.exe", "microsoft.screensketch_",
+    };
+    public List<string> StageExcluded { get; set; } = new(StageExcludedDefaults);
     public string WidgetMaterial { get; set; } = "glass"; // glass (the bar's) | dusk (dimmed glass, white ink) | color (their own faces)
     public bool HideTaskbar { get; set; }              // the system taskbar is hidden while Atrium runs
     public bool HideBanners { get; set; }              // Do Not Disturb: no system banners, notifications still become cards
@@ -117,6 +125,7 @@ internal sealed class BarSettings
     {
         var copy = (BarSettings)MemberwiseClone();
         copy.Pins = Pins == null ? null : new List<PinnedApp>(Pins);
+        copy.StageExcluded = new List<string>(StageExcluded);
         return copy;
     }
 
@@ -187,6 +196,10 @@ internal sealed class BarSettings
             ["winNumbers"] = WinNumbers,
             ["startOnLogin"] = StartOnLogin,
         };
+        var excluded = new JsonArray();
+        foreach (string app in StageExcluded)
+            excluded.Add(app);
+        o["stageExcluded"] = excluded;
         if (StartSize.Length > 0)
             o["startSize"] = StartSize;
         if (StartIcon.Length > 0)
@@ -263,6 +276,14 @@ internal sealed class BarSettings
         s.StageOnRight = Flag("stageOnRight", f.StageOnRight);
         s.StageAutoHide = Flag("stageAutoHide", f.StageAutoHide);
         s.StageMinimize = Flag("stageMinimize", f.StageMinimize);
+        s.StageExcluded = f.StageExcluded == null ? new List<string>() : new List<string>(f.StageExcluded);
+        if (o?["stageExcluded"] is JsonArray excluded)
+        {
+            s.StageExcluded = new List<string>();
+            foreach (JsonNode? node in excluded)
+                if (node is JsonValue value && value.TryGetValue(out string? app) && !string.IsNullOrWhiteSpace(app))
+                    s.StageExcluded.Add(app.Trim());
+        }
         s.WidgetMaterial = o?["widgetMaterial"] is JsonValue wm && wm.TryGetValue(out string? wms) && wms is "dusk" or "color" or "glass"
             ? wms : f.WidgetMaterial;
         s.HideTaskbar = Flag("hideTaskbar", f.HideTaskbar);
@@ -322,7 +343,8 @@ internal sealed class BarSettings
         ShowRunning == o.ShowRunning && TextColor == o.TextColor && Language == o.Language && AutoHide == o.AutoHide && StatusStyle == o.StatusStyle && NotifyTimeout == o.NotifyTimeout && NotifyHideBody == o.NotifyHideBody &&
         NotifyListener == o.NotifyListener && NotifyWeChat == o.NotifyWeChat && NotifyFeishu == o.NotifyFeishu && Bar == o.Bar && Widgets == o.Widgets &&
         WidgetsOnRight == o.WidgetsOnRight && WidgetBackdrop == o.WidgetBackdrop && StageManager == o.StageManager && StageOnRight == o.StageOnRight &&
-        StageAutoHide == o.StageAutoHide && StageMinimize == o.StageMinimize && WidgetMaterial == o.WidgetMaterial &&
+        StageAutoHide == o.StageAutoHide && StageMinimize == o.StageMinimize &&
+        StageExcluded.SequenceEqual(o.StageExcluded, StringComparer.OrdinalIgnoreCase) && WidgetMaterial == o.WidgetMaterial &&
         HideTaskbar == o.HideTaskbar && HideBanners == o.HideBanners && RemoteVisible == o.RemoteVisible && WinKeyStart == o.WinKeyStart && WinNumbers == o.WinNumbers &&
         StartOnLogin == o.StartOnLogin &&
         DockDisplayMode == o.DockDisplayMode && DockDisplayDelay == o.DockDisplayDelay && DockDisplay == o.DockDisplay && DesktopDisplay == o.DesktopDisplay &&

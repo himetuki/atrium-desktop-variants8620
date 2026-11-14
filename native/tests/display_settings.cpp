@@ -40,6 +40,17 @@ void CheckSettings()
         "hover rise toggles without changing icon magnification");
     settings.language = L"en";
     Require(Settings::FromJson(settings.ToJson(), Settings{}, parsed) && parsed.language == L"en", "the interface language survives saving");
+    settings.stageExcluded = {L"wechat.exe", L"tencent.qq_"};
+    Require(Settings::FromJson(settings.ToJson(), Settings{}, parsed) &&
+            parsed.stageExcluded == std::vector<std::wstring>{L"wechat.exe", L"tencent.qq_"},
+        "the Stage Manager blacklist survives saving");
+    Require(Settings::FromJson(LR"({"stageExcluded":[]})", Settings{}, parsed) && parsed.stageExcluded.empty(),
+        "an empty blacklist stays empty instead of falling back to the defaults");
+    Require(Settings::FromJson(LR"({"stageExcluded":"wechat.exe"})", Settings{}, parsed) &&
+            parsed.stageExcluded == DefaultStageExcluded(),
+        "a malformed blacklist keeps the current list");
+    Require(Settings::FromJson(LR"({})", Settings{}, parsed) && parsed.stageExcluded == DefaultStageExcluded(),
+        "old settings leave the screenshot tools out of Stage Manager");
     Require(Settings::FromJson(LR"({})", Settings{}, parsed) && parsed.language == L"auto", "old settings follow the system language");
     Require(Settings::FromJson(LR"({"language":"bad tag"})", Settings{}, parsed) && parsed.language == L"auto",
         "an unknown language follows the system");

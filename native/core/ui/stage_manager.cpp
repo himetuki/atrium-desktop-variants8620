@@ -194,12 +194,65 @@ void CALLBACK OnMinimizeStart(HWINEVENTHOOK, DWORD, HWND h, LONG object, LONG, D
 
 // ---- the stage ---------------------------------------------------------------------------------
 
+void StageManager::SetExcluded(std::vector<std::wstring> apps)
+{
+    const bool changed = apps != excluded_;
+    if (changed)
+        excluded_ = std::move(apps);
+    // Anything an excluded app already put away comes back and leaves the stage model. The sweep
+    // also runs when the list did not change, since saved state may hold entries from before.
+    bool touched = false;
+    Set release;
+    for (const auto& [h, p] : parked_)
+        if (StageAppExcluded(excluded_, p.key) && !Has(release, p.key))
+            release.push_back(p.key);
+    if (!release.empty()) {
+        Unpark(release, nullptr, false);
+        touched = true;
+    }
+    touched |= std::erase_if(stage_, [&](const std::wstring& key) { return StageAppExcluded(excluded_, key); }) > 0;
+    for (Set& set : recent_)
+        touched |= std::erase_if(set, [&](const std::wstring& key) { return StageAppExcluded(excluded_, key); }) > 0;
+    touched |= std::erase_if(recent_, [](const Set& set) { return set.empty(); }) > 0;
+    touched |= std::erase_if(pending_, [&](const std::wstring& key) { return StageAppExcluded(excluded_, key); }) > 0;
+    // A window that was on the stage gets its own minimize animation back.
+    if (!up_.empty()) {
+        const std::vector<TaskItem> snapshot = tasks_.Snapshot(true);
+        for (auto it = up_.begin(); it != up_.end();) {
+            bool excluded = false;
+            for (const TaskItem& t : snapshot) {
+                if (!StageAppExcluded(excluded_, t.key))
+                    continue;
+                if (std::find(t.windows.begin(), t.windows.end(), it->first) != t.windows.end()) {
+                    excluded = true;
+                    break;
+                }
+            }
+            if (excluded) {
+                Transitions(it->first, true);
+                it = up_.erase(it);
+                touched = true;
+            } else {
+                ++it;
+            }
+        }
+    }
+    if (!changed && !touched)
+        return;
+    openIntent_.Cancel();
+    Save();
+    Update(tasks_.Snapshot(true));
+    Rebuild();
+}
+
 void StageManager::SetEnabled(bool on)
 {
     if (on == enabled_ && applied_)
         return;
     applied_ = true;
     enabled_ = on;
+    openIntent_.Cancel();
+    pressed_ = -1;
     if (on) {
         stage_.clear();
         pending_.clear();
@@ -277,9 +330,12 @@ void StageManager::Update(const std::vector<TaskItem>& items)
 {
     HWND fg = GetForegroundWindow();
     HWND root = fg ? GetAncestor(fg, GA_ROOTOWNER) : nullptr;
-    // Window by window: each its own item, as each has its own card.
+    // Window by window: each its own item, as each has its own card. Excluded apps never
+    // enter the stage model at all.
     items_.clear();
     for (const TaskItem& t : items) {
+        if (StageAppExcluded(excluded_, t.key))
+            continue;
         const bool rootHere = std::find(t.windows.begin(), t.windows.end(), root) != t.windows.end();
         for (HWND h : t.windows) {
             TaskItem w = t;
@@ -295,6 +351,21 @@ void StageManager::Update(const std::vector<TaskItem>& items)
     if (!enabled_)
         return;
     Prune();
+    Set opened;
+    for (const TaskItem& t : items_)
+        if (openIntent_.Matches(AppOf(t.key), GetTickCount64()))
+            for (HWND h : t.windows) {
+                BOOL here = TRUE;
+                if (IsWindow(h) && IsWindowVisible(h) && OnMonitor(h, monitor_) && !Transient(h) &&
+                    (!desktops_ || FAILED(desktops_->IsWindowOnCurrentVirtualDesktop(h, &here)) || here))
+                    opened.push_back(t.key);
+            }
+    if (!opened.empty()) {
+        openIntent_.Cancel();
+        pending_ = opened;
+        pendingUntil_ = GetTickCount64() + kPendingMs;
+        Stage(opened, true, nullptr, false);
+    }
     AdoptMinimized();
     if (!pending_.empty() && GetTickCount64() > pendingUntil_)
         pending_.clear();
@@ -333,6 +404,7 @@ void StageManager::Stage(const Set& keys, bool add, HWND front, bool activate, c
 {
     Unpark(keys, front, activate, fly);
     if (!add) {
+        openIntent_.Cancel(); // a different stage supersedes an app launch still waiting for a window
         Set left; // the stage's apps that had windows up
         std::vector<Set> others;
         for (const TaskItem& t : items_) {
@@ -586,7 +658,7 @@ void StageManager::Unpark(const Set& keys, HWND front, bool activate, const std:
     }
 }
 
-void StageManager::Pick(const Set& keys, bool add)
+void StageManager::Pick(const Set& keys, bool add, HWND front)
 {
     pending_ = keys;
     pendingUntil_ = GetTickCount64() + kPendingMs;
@@ -601,12 +673,40 @@ void StageManager::Pick(const Set& keys, bool add)
                     from[h] = pose;
             }
     pendingUntil_ += ULONGLONG(kFlightMs);
-    Stage(keys, add, nullptr, true, &from);
+    Stage(keys, add, front, true, &from);
     Rebuild();
+}
+
+void StageManager::OpenInCurrentGroup(const std::wstring& app)
+{
+    if (!enabled_ || app.empty() || StageAppExcluded(excluded_, app))
+        return; // excluded apps are left where they are (their own open command still works)
+    openIntent_.Cancel();
+    Update(tasks_.Snapshot(true)); // the menu's snapshot may already be out of date
+    Set keys;
+    HWND front = nullptr;
+    for (const TaskItem& t : items_)
+        if (AppOf(t.key) == app)
+            for (HWND h : t.windows) {
+                BOOL here = TRUE;
+                if (!IsWindow(h) || !IsWindowVisible(h) || !OnMonitor(h, monitor_) || Transient(h) ||
+                    (desktops_ && SUCCEEDED(desktops_->IsWindowOnCurrentVirtualDesktop(h, &here)) && !here))
+                    continue;
+                keys.push_back(t.key);
+                if (!front)
+                    front = h;
+            }
+    if (!keys.empty())
+        Pick(keys, true, front);
+    else {
+        openIntent_.Arm(app, GetTickCount64());
+        tasks_.Launch(app);
+    }
 }
 
 void StageManager::RestoreAll()
 {
+    openIntent_.Cancel();
     ReleaseUp();
     // Pictures on their way back: their windows come up now.
     for (Flight& f : flights_)
@@ -998,14 +1098,11 @@ int StageManager::Capacity() const
     return std::clamp(int((avail + kSlotGap) / kSlot), 1, kMaxEntries);
 }
 
-void StageManager::Rebuild()
+void StageManager::Rebuild(bool keepAnchor)
 {
     std::vector<Entry> next;
     if (enabled_) {
-        const int cap = Capacity();
         for (const Set& set : recent_) {
-            if (int(next.size()) >= cap)
-                break;
             std::vector<std::pair<uint64_t, HWND>> mine;
             for (const auto& [h, p] : parked_) {
                 if (!Has(set, p.key) || !IsWindow(h))
@@ -1034,6 +1131,22 @@ void StageManager::Rebuild()
                 e.windows.push_back(mine[i].second);
             next.push_back(std::move(e));
         }
+    }
+    scrollCount_ = next.size();
+    scroll_.Fit(scrollCount_);
+    if (keepAnchor && !entries_.empty()) {
+        auto anchor = std::find_if(next.begin(), next.end(), [&](const Entry& e) { return e.keys == entries_.front().keys; });
+        if (anchor != next.end())
+            scroll_.Anchor(size_t(anchor - next.begin()), scrollCount_);
+    }
+    if (!next.empty())
+        std::rotate(next.begin(), next.begin() + scroll_.Offset(), next.end());
+    if (next.size() > size_t(Capacity()))
+        next.resize(size_t(Capacity()));
+    // An index can now name another group. Check identity before the old keys are moved/cleared.
+    if (pressed_ >= 0 && (size_t(pressed_) >= next.size() || size_t(pressed_) >= entries_.size() ||
+                         next[size_t(pressed_)].keys != entries_[size_t(pressed_)].keys)) {
+        pressed_ = -1;
     }
     const bool visible = shown_ && surface_.Visible();
     // A set keeps its card (where it is, how far it is hovered).
@@ -1641,6 +1754,21 @@ bool StageManager::Message(UINT m, WPARAM w, LPARAM l, LRESULT& result)
             return true;
         }
         return false;
+    case WM_MOUSEWHEEL:
+    case WM_MOUSEHWHEEL: {
+        // Wheel messages carry screen pixels, unlike the other Surface mouse messages.
+        const POINT content = surface_.ScreenToContent(pt);
+        if (!shown_ || EntryAt(content) < 0)
+            return false;
+        pressed_ = -1;
+        if (scroll_.Wheel(GET_WHEEL_DELTA_WPARAM(w), m == WM_MOUSEHWHEEL, scrollCount_)) {
+            // An explicit scroll changes the anchor; model-only rebuilds keep it.
+            hover_ = -1;
+            Rebuild(false);
+        }
+        surface_.Invalidate();
+        return true;
+    }
     case WM_MOUSEMOVE: {
         if (!tracking_) {
             TRACKMOUSEEVENT tme{sizeof(tme), TME_LEAVE, surface_.Hwnd(), 0};

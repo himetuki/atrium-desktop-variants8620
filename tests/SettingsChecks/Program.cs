@@ -32,6 +32,21 @@ Require(!BarSettings.FromJson(new JsonObject(), new()).StageMinimize, "Old files
 parsed = BarSettings.FromJson(JsonNode.Parse("""{"stageMinimize":true}""")!.AsObject(), new());
 Require(parsed.StageMinimize && BarSettings.FromJson(parsed.ToJson(), new()).StageMinimize && !new BarSettings().SameAs(parsed),
     "Minimizing to Stage Manager must survive a round trip and mark the settings dirty.");
+var excludedDefault = new BarSettings();
+Require(excludedDefault.StageExcluded.SequenceEqual(BarSettings.StageExcludedDefaults) &&
+        excludedDefault.StageExcluded.Contains("snippingtool.exe") && excludedDefault.StageExcluded.Contains("microsoft.screensketch_") &&
+        !excludedDefault.StageExcluded.Contains("wechat.exe") && !excludedDefault.StageExcluded.Contains("notepad.exe"),
+    "The Stage Manager blacklist must start with the Windows screenshot tools.");
+var excluded = BarSettings.FromJson(JsonNode.Parse("""{"stageExcluded":["wechat.exe","tencent.qq_"]}""")!.AsObject(), new());
+Require(excluded.StageExcluded.SequenceEqual(new[] { "wechat.exe", "tencent.qq_" }) &&
+        BarSettings.FromJson(excluded.ToJson(), new()).SameAs(excluded) && !new BarSettings().SameAs(excluded),
+    "The Stage Manager blacklist must survive a round trip and mark the settings dirty.");
+var excludedEmpty = BarSettings.FromJson(JsonNode.Parse("""{"stageExcluded":[]}""")!.AsObject(), new());
+Require(excludedEmpty.StageExcluded.Count == 0 && BarSettings.FromJson(excludedEmpty.ToJson(), new()).SameAs(excludedEmpty),
+    "An empty Stage Manager blacklist must stay empty and survive a round trip.");
+var excludedMalformed = BarSettings.FromJson(JsonNode.Parse("""{"stageExcluded":false}""")!.AsObject(), excluded);
+Require(excludedMalformed.StageExcluded.SequenceEqual(excluded.StageExcluded),
+    "A malformed Stage Manager blacklist must retain the current list.");
 Require(!BarSettings.FromJson(new JsonObject(), new()).ShowClockSeconds, "Old files must keep the clock at minutes.");
 Require(!new BarSettings().MagnifyNear && !BarSettings.FromJson(new JsonObject(), new()).MagnifyNear,
     "Icons must not magnify above the bar unless chosen.");

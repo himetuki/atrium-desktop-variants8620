@@ -4,6 +4,7 @@
 #pragma once
 
 #include "shell/task_model.h"
+#include "ui/stage_excluded.h"
 
 #include <cstdint>
 #include <optional>
@@ -90,6 +91,9 @@ struct Settings {
     bool stageOnRight = false;       // the strip's side; left by default (the widgets take the other side)
     bool stageAutoHide = false;      // the strip only comes out while the pointer rests on its edge of the screen
     bool stageMinimize = false;      // a window minimized on the stage goes to the strip
+    // Apps Stage Manager leaves alone: their windows are never put away. Defaults cover the
+    // screenshot tools whose own overlay/control bar must stay on screen while recording.
+    std::vector<std::wstring> stageExcluded = DefaultStageExcluded();
     // The widgets' material: glass (the bar's, its ink adapting) | dusk (the glass dimmed, white ink;
     // macOS's dimmed desktop widgets) | color (their own opaque faces, as macOS's full-colour widgets).
     std::wstring widgetMaterial = L"glass";

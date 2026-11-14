@@ -18,6 +18,11 @@ target_include_directories(app_processes_tests PRIVATE ../core)
 target_compile_definitions(app_processes_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 add_test(NAME app_processes COMMAND app_processes_tests)
 
+add_executable(stage_excluded_tests stage_excluded.cpp)
+target_include_directories(stage_excluded_tests PRIVATE ../core)
+target_compile_definitions(stage_excluded_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+add_test(NAME stage_excluded COMMAND stage_excluded_tests)
+
 add_executable(double_click_tests
     double_click.cpp)
 target_include_directories(double_click_tests PRIVATE ../core)
@@ -56,3 +61,8 @@ add_test(NAME localization COMMAND localization_tests)
 add_custom_command(TARGET localization_tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/../locales" "$<TARGET_FILE_DIR:localization_tests>/locales"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/../tests/fixtures/locales" "$<TARGET_FILE_DIR:localization_tests>/locales")
+
+add_executable(stage_scroll_tests stage_scroll.cpp)
+target_include_directories(stage_scroll_tests PRIVATE ../core)
+target_compile_definitions(stage_scroll_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+add_test(NAME stage_scroll COMMAND stage_scroll_tests)
