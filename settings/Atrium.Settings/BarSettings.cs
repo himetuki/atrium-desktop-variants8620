@@ -74,6 +74,30 @@ internal sealed class BarSettings
     // system's ("run as administrator", "properties").
     public bool WindowsContextMenu { get; set; } = true;
     public double NotifyTimeout { get; set; } = 6;    // seconds a popup stays
+    public double ImeStateSettleMs { get; set; } = 0;  // ms a switch dwells before it shows (issue #56)
+    public double ImeCaseSettleMs { get; set; } = 250;  // ms a case-only change dwells before it shows
+    // A fullscreen game from the no-bubble list keeps the bubble quiet. The list starts as a
+    // copy of stageExcluded and the core keeps it in step; pinned entries were edited here and
+    // are never synced again.
+    public bool ImeBubbleGamePause { get; set; } = true;
+    // Windows 11's input-switch flyout is hidden: Win+Space keeps switching, the picker does not show.
+    public bool ImeHideSwitchPopup { get; set; } = true;
+    public List<string> ImeNoBubbleGames { get; set; } = new();
+    public List<string> ImeNoBubblePinned { get; set; } = new();
+    // The bubble's feel (ImeBubbleTuning in native/core/ui/ime_bubble.h). The
+    // defaults are the original constants, so an untuned bubble is unchanged.
+    public double ImeCompression { get; set; } = 0.10; // fraction the hit squashes the skin
+    public double ImeRebound { get; set; } = 0.31;     // the merge spring's overshoot past its target
+    public double ImeWobbleAmp { get; set; } = 0.875;  // the liquid wobble's base amplitude
+    public double ImeWobbleHz { get; set; } = 4.3;     // the liquid wobble's base rhythm, Hz
+    public double ImeBubbleLifeMs { get; set; } = 1060; // how long one bubble lives, ms
+    public double ImeFirstBirthDip { get; set; } = 18;  // the first bubble's birth below its resting centre, DIP
+    public double ImeLobeBirthDip { get; set; } = 10;   // a newcomer's birth below the window's bottom edge, DIP
+    public double ImeLobeRiseMs { get; set; } = 380;    // the newcomer's slow rise, ms
+    public double ImeLobeAttachMs { get; set; } = 243;  // its fast approach into the rim, ms
+    public double ImeLobeSwallowMs { get; set; } = 137; // its swallow into the skin, ms
+    public double ImeBubbleStartRadius { get; set; } = 32; // radius of the first bubble, DIP
+    public double ImeBubbleEndRadius { get; set; } = 51;   // radius ten merges reach, DIP
     public string NotifyPlacement { get; set; } = "dock"; // dock (default) | topLeft | topRight | bottomLeft | bottomRight
     public static readonly string[] NotifyCorners = { "topLeft", "topRight", "bottomLeft", "bottomRight" };
     public bool NotifyHideBody { get; set; }           // privacy: no message text, excluded from capture
@@ -135,8 +159,11 @@ internal sealed class BarSettings
     public BarSettings Clone()
     {
         var copy = (BarSettings)MemberwiseClone();
+        copy.ImeHideSwitchPopup = ImeHideSwitchPopup;
         copy.Pins = Pins == null ? null : new List<PinnedApp>(Pins);
         copy.StageExcluded = new List<string>(StageExcluded);
+        copy.ImeNoBubbleGames = new List<string>(ImeNoBubbleGames);
+        copy.ImeNoBubblePinned = new List<string>(ImeNoBubblePinned);
         return copy;
     }
 
@@ -191,6 +218,22 @@ internal sealed class BarSettings
             ["taskbarRightPrimaryOnly"] = TaskbarRightPrimaryOnly,
             ["windowsContextMenu"] = WindowsContextMenu,
             ["notifyTimeout"] = NotifyTimeout,
+            ["imeStateSettleMs"] = ImeStateSettleMs,
+            ["imeCaseSettleMs"] = ImeCaseSettleMs,
+            ["imeBubbleGamePause"] = ImeBubbleGamePause,
+            ["imeHideSwitchPopup"] = ImeHideSwitchPopup,
+            ["imeCompression"] = ImeCompression,
+            ["imeRebound"] = ImeRebound,
+            ["imeWobbleAmp"] = ImeWobbleAmp,
+            ["imeWobbleHz"] = ImeWobbleHz,
+            ["imeBubbleLifeMs"] = ImeBubbleLifeMs,
+            ["imeFirstBirthDip"] = ImeFirstBirthDip,
+            ["imeLobeBirthDip"] = ImeLobeBirthDip,
+            ["imeLobeRiseMs"] = ImeLobeRiseMs,
+            ["imeLobeAttachMs"] = ImeLobeAttachMs,
+            ["imeLobeSwallowMs"] = ImeLobeSwallowMs,
+            ["imeBubbleStartRadius"] = ImeBubbleStartRadius,
+            ["imeBubbleEndRadius"] = ImeBubbleEndRadius,
             ["notifyPlacement"] = NotifyPlacement,
             ["notifyHideBody"] = NotifyHideBody,
             ["notifyListener"] = NotifyListener,
@@ -221,6 +264,14 @@ internal sealed class BarSettings
         foreach (string app in StageExcluded)
             excluded.Add(app);
         o["stageExcluded"] = excluded;
+        var noBubble = new JsonArray();
+        foreach (string app in ImeNoBubbleGames)
+            noBubble.Add(app);
+        o["imeNoBubbleGames"] = noBubble;
+        var noBubblePinned = new JsonArray();
+        foreach (string app in ImeNoBubblePinned)
+            noBubblePinned.Add(app);
+        o["imeNoBubblePinned"] = noBubblePinned;
         if (StartSize.Length > 0)
             o["startSize"] = StartSize;
         if (StartIcon.Length > 0)
@@ -285,6 +336,24 @@ internal sealed class BarSettings
         s.AutoWidth = Flag("autoWidth", f.AutoWidth);
         s.ShowRunning = Flag("showRunning", f.ShowRunning);
         s.NotifyTimeout = Math.Clamp(Num("notifyTimeout", f.NotifyTimeout), 3, 30);
+        s.ImeStateSettleMs = Math.Clamp(Num("imeStateSettleMs", f.ImeStateSettleMs), 0, 2000);
+        s.ImeCaseSettleMs = Math.Clamp(Num("imeCaseSettleMs", f.ImeCaseSettleMs), 0, 2000);
+        s.ImeBubbleGamePause = Flag("imeBubbleGamePause", f.ImeBubbleGamePause);
+        s.ImeHideSwitchPopup = Flag("imeHideSwitchPopup", f.ImeHideSwitchPopup);
+        s.ImeCompression = Math.Clamp(Num("imeCompression", f.ImeCompression), 0, 0.4);
+        s.ImeRebound = Math.Clamp(Num("imeRebound", f.ImeRebound), 0.02, 0.6);
+        s.ImeWobbleAmp = Math.Clamp(Num("imeWobbleAmp", f.ImeWobbleAmp), 0, 1.5);
+        s.ImeWobbleHz = Math.Clamp(Num("imeWobbleHz", f.ImeWobbleHz), 1, 10);
+        s.ImeBubbleLifeMs = Math.Clamp(Num("imeBubbleLifeMs", f.ImeBubbleLifeMs), 400, 3000);
+        s.ImeFirstBirthDip = Math.Clamp(Num("imeFirstBirthDip", f.ImeFirstBirthDip), 0, 120);
+        s.ImeLobeBirthDip = Math.Clamp(Num("imeLobeBirthDip", f.ImeLobeBirthDip), 0, 80);
+        s.ImeLobeRiseMs = Math.Clamp(Num("imeLobeRiseMs", f.ImeLobeRiseMs), 40, 2000);
+        s.ImeLobeAttachMs = Math.Clamp(Num("imeLobeAttachMs", f.ImeLobeAttachMs), 40, 2000);
+        s.ImeLobeSwallowMs = Math.Clamp(Num("imeLobeSwallowMs", f.ImeLobeSwallowMs), 40, 2000);
+        s.ImeBubbleStartRadius = Math.Clamp(Num("imeBubbleStartRadius", f.ImeBubbleStartRadius), 16, 40);
+        s.ImeBubbleEndRadius = Math.Clamp(Num("imeBubbleEndRadius", f.ImeBubbleEndRadius), 24, 52);
+        if (s.ImeBubbleEndRadius < s.ImeBubbleStartRadius)
+            s.ImeBubbleEndRadius = s.ImeBubbleStartRadius; // the curve only ever grows
         s.NotifyHideBody = Flag("notifyHideBody", f.NotifyHideBody);
         // Version 1 files saved the old default (off): from version 2 it is on (as in the core).
         bool v1 = o?["version"] is JsonValue ver && ver.TryGetValue(out double vn) && vn < 2;
@@ -313,6 +382,22 @@ internal sealed class BarSettings
             foreach (JsonNode? node in excluded)
                 if (node is JsonValue value && value.TryGetValue(out string? app) && !string.IsNullOrWhiteSpace(app))
                     s.StageExcluded.Add(app.Trim());
+        }
+        s.ImeNoBubbleGames = f.ImeNoBubbleGames == null ? new List<string>() : new List<string>(f.ImeNoBubbleGames);
+        if (o?["imeNoBubbleGames"] is JsonArray noBubble)
+        {
+            s.ImeNoBubbleGames = new List<string>();
+            foreach (JsonNode? node in noBubble)
+                if (node is JsonValue value && value.TryGetValue(out string? app) && !string.IsNullOrWhiteSpace(app))
+                    s.ImeNoBubbleGames.Add(app.Trim());
+        }
+        s.ImeNoBubblePinned = f.ImeNoBubblePinned == null ? new List<string>() : new List<string>(f.ImeNoBubblePinned);
+        if (o?["imeNoBubblePinned"] is JsonArray noBubblePinned)
+        {
+            s.ImeNoBubblePinned = new List<string>();
+            foreach (JsonNode? node in noBubblePinned)
+                if (node is JsonValue value && value.TryGetValue(out string? app) && !string.IsNullOrWhiteSpace(app))
+                    s.ImeNoBubblePinned.Add(app.Trim());
         }
         s.WidgetMaterial = o?["widgetMaterial"] is JsonValue wm && wm.TryGetValue(out string? wms) && wms is "dusk" or "color" or "glass"
             ? wms : f.WidgetMaterial;
@@ -375,6 +460,15 @@ internal sealed class BarSettings
         ShowTray == o.ShowTray && TrayHost == o.TrayHost && StartTray == o.StartTray && StartStatus == o.StartStatus && StartCentered == o.StartCentered && StartWithBar == o.StartWithBar && StartSize == o.StartSize && StartIcon == o.StartIcon &&
         ShowStatus == o.ShowStatus && ShowNotifications == o.ShowNotifications && ShowDesktop == o.ShowDesktop &&
         ShowRunning == o.ShowRunning && TextColor == o.TextColor && Language == o.Language && AutoHide == o.AutoHide && BarEdge == o.BarEdge && StatusStyle == o.StatusStyle && NotifyTimeout == o.NotifyTimeout && NotifyHideBody == o.NotifyHideBody &&
+        ImeStateSettleMs == o.ImeStateSettleMs && ImeCaseSettleMs == o.ImeCaseSettleMs && ImeBubbleGamePause == o.ImeBubbleGamePause &&
+        ImeHideSwitchPopup == o.ImeHideSwitchPopup &&
+        ImeNoBubbleGames.SequenceEqual(o.ImeNoBubbleGames, StringComparer.OrdinalIgnoreCase) &&
+        ImeNoBubblePinned.SequenceEqual(o.ImeNoBubblePinned, StringComparer.OrdinalIgnoreCase) &&
+        ImeCompression == o.ImeCompression &&
+        ImeRebound == o.ImeRebound && ImeWobbleAmp == o.ImeWobbleAmp && ImeWobbleHz == o.ImeWobbleHz && ImeBubbleLifeMs == o.ImeBubbleLifeMs &&
+        ImeFirstBirthDip == o.ImeFirstBirthDip && ImeLobeBirthDip == o.ImeLobeBirthDip && ImeLobeRiseMs == o.ImeLobeRiseMs &&
+        ImeLobeAttachMs == o.ImeLobeAttachMs && ImeLobeSwallowMs == o.ImeLobeSwallowMs && ImeBubbleStartRadius == o.ImeBubbleStartRadius &&
+        ImeBubbleEndRadius == o.ImeBubbleEndRadius &&
         NotifyListener == o.NotifyListener && NotifyWeChat == o.NotifyWeChat && NotifyFeishu == o.NotifyFeishu &&
         NotifyQQ == o.NotifyQQ && NotifyWeCom == o.NotifyWeCom && NotifyDingTalk == o.NotifyDingTalk && AttentionLight == o.AttentionLight && AttentionBounce == o.AttentionBounce && Bar == o.Bar && Widgets == o.Widgets &&
         WidgetsOnRight == o.WidgetsOnRight && WidgetBackdrop == o.WidgetBackdrop && StageManager == o.StageManager && StageOnRight == o.StageOnRight &&

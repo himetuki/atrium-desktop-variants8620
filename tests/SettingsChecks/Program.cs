@@ -51,6 +51,66 @@ Require(excludedEmpty.StageExcluded.Count == 0 && BarSettings.FromJson(excludedE
 var excludedMalformed = BarSettings.FromJson(JsonNode.Parse("""{"stageExcluded":false}""")!.AsObject(), excluded);
 Require(excludedMalformed.StageExcluded.SequenceEqual(excluded.StageExcluded),
     "A malformed Stage Manager blacklist must retain the current list.");
+var noBubbleDefaults = new BarSettings();
+Require(noBubbleDefaults.ToJson()["imeBubbleGamePause"] is JsonValue noBubblePause && noBubblePause.TryGetValue(out bool noBubblePauseValue) && noBubblePauseValue,
+    "No bubble over fullscreen games must serialize as a boolean that is on by default.");
+Require(noBubbleDefaults.ImeNoBubbleGames.Count == 0 && noBubbleDefaults.ImeNoBubblePinned.Count == 0 &&
+        noBubbleDefaults.ToJson()["imeNoBubbleGames"] is JsonArray && noBubbleDefaults.ToJson()["imeNoBubblePinned"] is JsonArray &&
+        BarSettings.FromJson(new JsonObject(), new()).ImeBubbleGamePause,
+    "The no-bubble lists must start empty, serialize as arrays and the pause must hold for old files.");
+var noBubble = new BarSettings
+{
+    ImeNoBubbleGames = { @"D:\Games\SteamLibrary\steamapps\common\Elden Ring\", "notepad.exe" },
+    ImeNoBubblePinned = { "notepad.exe" },
+};
+var noBubbleJson = noBubble.ToJson();
+Require(noBubbleJson["imeNoBubbleGames"] is JsonArray noBubbleGames && noBubbleGames.Count == 2 &&
+        noBubbleGames[0]!.GetValue<string>() == @"D:\Games\SteamLibrary\steamapps\common\Elden Ring\" &&
+        noBubbleGames[1]!.GetValue<string>() == "notepad.exe" &&
+        noBubbleJson["imeNoBubblePinned"] is JsonArray noBubblePinned && noBubblePinned.Count == 1 && noBubblePinned[0]!.GetValue<string>() == "notepad.exe",
+    "A folder entry ending in a backslash and a program name must serialize under the exact protocol keys.");
+var noBubbleRoundTrip = BarSettings.FromJson(JsonNode.Parse(noBubbleJson.ToJsonString())!.AsObject(), new());
+Require(noBubbleRoundTrip.ImeNoBubbleGames.SequenceEqual(noBubble.ImeNoBubbleGames) &&
+        noBubbleRoundTrip.ImeNoBubblePinned.SequenceEqual(noBubble.ImeNoBubblePinned) && noBubble.SameAs(noBubbleRoundTrip) &&
+        !new BarSettings().SameAs(noBubbleRoundTrip),
+    "The no-bubble games and pinned entries must round-trip and mark the settings dirty.");
+var noBubbleEmpty = BarSettings.FromJson(JsonNode.Parse("""{"imeNoBubbleGames":[],"imeNoBubblePinned":[]}""")!.AsObject(), noBubble);
+Require(noBubbleEmpty.ImeNoBubbleGames.Count == 0 && noBubbleEmpty.ImeNoBubblePinned.Count == 0 &&
+        BarSettings.FromJson(noBubbleEmpty.ToJson(), new()).SameAs(noBubbleEmpty),
+    "Empty no-bubble lists must stay empty and survive a round trip.");
+var noBubbleMalformed = BarSettings.FromJson(JsonNode.Parse("""{"imeNoBubbleGames":false,"imeNoBubblePinned":42}""")!.AsObject(), noBubble);
+Require(noBubbleMalformed.ImeNoBubbleGames.SequenceEqual(noBubble.ImeNoBubbleGames) &&
+        noBubbleMalformed.ImeNoBubblePinned.SequenceEqual(noBubble.ImeNoBubblePinned),
+    "Malformed no-bubble lists must retain the current entries.");
+var noBubbleCase = noBubble.Clone();
+noBubbleCase.ImeNoBubbleGames = new List<string> { @"D:\GAMES\STEAMLIBRARY\STEAMAPPS\COMMON\ELDEN RING\", "NOTEPAD.EXE" };
+Require(noBubble.SameAs(noBubbleCase), "The no-bubble lists must compare case-insensitively, as the Stage Manager blacklist does.");
+var noBubbleChanged = noBubble.Clone();
+noBubbleChanged.ImeNoBubbleGames.Add("other.exe");
+Require(!noBubble.SameAs(noBubbleChanged), "A changed no-bubble list must mark the settings dirty.");
+var noBubbleOff = BarSettings.FromJson(JsonNode.Parse("""{"imeBubbleGamePause":false}""")!.AsObject(), new());
+Require(!noBubbleOff.ImeBubbleGamePause && BarSettings.FromJson(noBubbleOff.ToJson(), new()).SameAs(noBubbleOff) && !new BarSettings().SameAs(noBubbleOff),
+    "Turning the fullscreen-game bubble pause off must survive a round trip and mark the settings dirty.");
+Require(BarSettings.FromJson(JsonNode.Parse("""{"imeBubbleGamePause":"bad"}""")!.AsObject(), new() { ImeBubbleGamePause = false }).ImeBubbleGamePause == false,
+    "Malformed fullscreen-game bubble pause must retain the current choice.");
+Require(new BarSettings().ToJson()["imeHideSwitchPopup"] is JsonValue hideDefault && hideDefault.TryGetValue(out bool hideDefaultValue) && hideDefaultValue &&
+        new BarSettings().ImeHideSwitchPopup && BarSettings.FromJson(new JsonObject(), new()).ImeHideSwitchPopup,
+    "Hiding the system input-switch popup must serialize as a boolean that is on by default and hold for old files.");
+var hideOff = BarSettings.FromJson(JsonNode.Parse("""{"imeHideSwitchPopup":false}""")!.AsObject(), new());
+Require(!hideOff.ImeHideSwitchPopup && BarSettings.FromJson(hideOff.ToJson(), new()).SameAs(hideOff) && !new BarSettings().SameAs(hideOff),
+    "Showing the system input-switch popup again must survive a round trip and mark the settings dirty.");
+var hideSnapshot = hideOff.Clone();
+Require(hideSnapshot.ImeHideSwitchPopup == hideOff.ImeHideSwitchPopup && hideSnapshot.SameAs(hideOff),
+    "Preview and Save snapshots must copy the input-switch popup choice without marking settings dirty.");
+hideOff.ImeHideSwitchPopup = true;
+Require(hideSnapshot.ImeHideSwitchPopup == false && !hideOff.SameAs(hideSnapshot),
+    "Changing the input-switch popup hiding must mark settings dirty without mutating snapshots.");
+Require(BarSettings.FromJson(new JsonObject { ["imeHideSwitchPopup"] = true }, hideSnapshot).ImeHideSwitchPopup == true,
+    "An explicit input-switch popup boolean must override the fallback.");
+Require(BarSettings.FromJson(new JsonObject(), hideSnapshot).ImeHideSwitchPopup == hideSnapshot.ImeHideSwitchPopup,
+    "Missing input-switch popup hiding must retain the current choice, including partial updates.");
+Require(BarSettings.FromJson(JsonNode.Parse("""{"imeHideSwitchPopup":"bad"}""")!.AsObject(), hideSnapshot).ImeHideSwitchPopup == hideSnapshot.ImeHideSwitchPopup,
+    "Malformed input-switch popup hiding must retain the current choice, not coerce other JSON types.");
 Require(!BarSettings.FromJson(new JsonObject(), new()).ShowClockSeconds, "Old files must keep the clock at minutes.");
 Require(!new BarSettings().MagnifyNear && !BarSettings.FromJson(new JsonObject(), new()).MagnifyNear,
     "Icons must not magnify above the bar unless chosen.");

@@ -79,6 +79,44 @@ struct Settings {
     bool windowsContextMenu = true;
     // Notifications (Atrium's own cards above the bell).
     double notifyTimeout = 6;        // seconds a popup stays (3..30)
+    // The input method announcements (issue #56): a change shows after it has
+    // dwelt this long - a real switch, and a case-only change of its own.
+    double imeStateSettleMs = 0;     // ms (0..2000): a switch follows the hand at once by default
+    double imeCaseSettleMs = 250;    // ms (0..2000)
+    // Windows 11 shows its own input-switch flyout for Win+Space; hiding it
+    // (two Toggle registry values) leaves the switching itself untouched. Off
+    // restores Windows' default.
+    bool imeHideSwitchPopup = true;
+    // The bubble's feel (ImeBubbleTuning in ui/ime_bubble.h): how deeply the hit
+    // compresses the skin, how far the merge spring rebounds, the liquid wobble's
+    // base amplitude and rhythm, how long one bubble lives, where the first
+    // bubble and a newcomer are born, and how the newcomer's absorb divides into
+    // its three acts. The defaults are the original constants, so an untuned
+    // bubble behaves exactly as before.
+    double imeCompression = 0.10;    // fraction the hit squashes the skin (0..0.4)
+    double imeRebound = 0.31;        // the merge spring's overshoot past its target (0.02..0.6)
+    double imeWobbleAmp = 0.875;     // the liquid wobble's base amplitude (0..1.5)
+    double imeWobbleHz = 4.3;        // the liquid wobble's base rhythm, Hz (1..10)
+    double imeBubbleLifeMs = 1060;   // how long the bubble lives before it bursts, ms (400..3000)
+    double imeFirstBirthDip = 18;    // the first bubble's birth below its resting centre, DIP (0..120)
+    double imeLobeBirthDip = 10;     // a newcomer's birth below the window's bottom edge, DIP (0..80)
+    double imeLobeRiseMs = 380;      // the newcomer's slow rise, ms (40..2000)
+    double imeLobeAttachMs = 243;    // its fast approach into the rim, ms (40..2000)
+    double imeLobeSwallowMs = 137;   // its swallow into the skin, ms (40..2000)
+    // The bubble's size, DIP of radius: the first bubble's and the one ten
+    // merges reach, the merges between interpolated in the count's logarithm.
+    // The end is capped at 52 so a fully merged burst still fits the bubble's
+    // 240-DIP-tall window.
+    double imeBubbleStartRadius = 32; // radius of the first bubble (16..40)
+    double imeBubbleEndRadius = 51;   // radius ten merges reach (24..52), never below the start
+    // While a fullscreen game is in front, the bubble does not cover the bottom
+    // of the screen: the bar's status icon still announces. The no-bubble list
+    // starts as a copy of the Stage Manager list and later only grows with new
+    // stage entries; what the user edited in Settings is pinned so it is never
+    // synced back.
+    bool imeBubbleGamePause = true;          // no bubble over fullscreen games
+    std::vector<std::wstring> imeNoBubbleGames;  // exe names, package prefixes or install folders, as stageExcluded
+    std::vector<std::wstring> imeNoBubblePinned; // entries edited in Settings: never auto-synced again
     std::wstring notifyPlacement = L"dock"; // dock (default) | topLeft | topRight | bottomLeft | bottomRight (the main screen's)
     bool notifyHideBody = false;     // privacy: no message text; cards excluded from screen capture
     bool notifyListener = true;      // Windows notifications as Atrium cards (UserNotificationListener)

@@ -14,6 +14,8 @@
 #include "shell/app_catalog.h"
 #include "shell/shell_taskbar.h"
 #include "shell/app_registration.h"
+#include "shell/displays.h"
+#include "shell/ime_status.h"
 #include "shell/update_checker.h"
 #include "shell/task_model.h"
 #include "shell/notification_listener.h"
@@ -31,6 +33,8 @@
 #include "ui/control_center.h"
 #include "ui/desktop_widgets.h"
 #include "ui/glass_menu.h"
+#include "ui/ime_bubble.h"
+#include "ui/ime_bubble_gate.h"
 #include "ui/window_preview.h"
 #include "ui/notifications.h"
 #include "ui/stage_manager.h"
@@ -48,6 +52,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <vector>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -70,18 +75,159 @@ constexpr UINT WM_STATUS = WM_APP + 10;       // lParam: SystemStatus*, read off
 constexpr UINT WM_UPDATE_READY = WM_APP + 11; // background package is validated and ready
 constexpr UINT WM_WIN_KEY = WM_APP + 12;      // the Windows key alone (wParam 0, winKeyStart), Win + 1..9, 0 (1..10, winNumbers)
 constexpr UINT WM_USB = WM_APP + 13;          // the device worker has queued removal notices
+constexpr UINT WM_IME_STATE = WM_APP + 16;    // lParam: ImeProbe::Sample* (or null: its heartbeat)
 constexpr UINT_PTR kStatusTimer = 0x52;       // the bar's status icon
 constexpr UINT_PTR kTrayFocusTimer = 0x53;    // after a forwarded tray click
 constexpr UINT_PTR kDisplaySettleTimer = 0x56; // once more after a display change, the topology settled
 constexpr UINT_PTR kMessengerTimer = 0x57;     // a chat app's flash: did a card with its text follow?
 constexpr UINT_PTR kReadyTimer = 0x54;       // only during an update startup handshake
 constexpr UINT kStatusMs = 3000;
+constexpr UINT kImeProbeMs = 60; // a switch should show at the next sample: follow the hand
+constexpr ULONGLONG kImeRetryMs = 400; // how long a stalled IME window is spared the two blocking reads
 constexpr UINT kTrayId = 1;
 
 enum Command : UINT {
     kCmdSettings = 100, kCmdToggle, kCmdExit, kCmdNewWindow, kCmdPin, kCmdUnpin, kCmdClose, kCmdOpenLocation, kCmdDesktop, kCmdTaskManager, kCmdTerminate, kCmdTerminateConfirm,
     kCmdWidgets, kCmdStage, kCmdWidgetsModule, kCmdStageAdd, kCmdRunAs, kCmdProperties,
     kCmdRecent = 2000 // + index into the recent list (its length is bounded)
+};
+
+// The input method is asked off the UI thread (issue #56): its control
+// messages go to the foreground window's IME window and may stall there, so a
+// stalled app must not stall the bar's frames. The probe reads the state; the
+// UI thread resolves the (TSF, COM) name and decides what announces.
+//
+// The window the keys actually go to: the foreground queue's focus window when
+// it has one, else the top-level window in front. Electron/WebView2/WinUI3
+// hosts can put the focused child on a thread of its own, and that thread's
+// keyboard layout is the one in use — the top-level window's may be stale.
+HWND FocusWindow(HWND foreground)
+{
+    if (!foreground)
+        return nullptr;
+    GUITHREADINFO info{sizeof(info)};
+    if (GetGUIThreadInfo(0, &info)) { // 0: the foreground thread's queue
+        if (HWND focus = info.hwndFocus ? info.hwndFocus : info.hwndActive)
+            return focus;
+    }
+    return foreground;
+}
+
+class ImeProbe {
+public:
+    struct Sample {
+        HWND foreground = nullptr; // the top-level window in front (what announces)
+        DWORD thread = 0;          // the focus thread the status was read from (the shadow's key)
+        ImeStatus status;
+    };
+
+    explicit ImeProbe(HWND host) : host_(host), thread_([this] { Run(); }) {}
+    ~ImeProbe()
+    {
+        stop_ = true;
+        if (thread_.joinable())
+            thread_.join();
+    }
+    ImeProbe(const ImeProbe&) = delete;
+    ImeProbe& operator=(const ImeProbe&) = delete;
+
+private:
+    // The last complete read: a stalled poll of the same foreground thread and
+    // layout carries its conversion state forward instead of reading as a
+    // false "English direct input".
+    struct Cached {
+        HWND foreground = nullptr;
+        DWORD thread = 0;
+        ImeStatus status;
+        bool valid = false;
+    };
+
+    void Run()
+    {
+        SetThreadDescription(GetCurrentThread(), L"Atrium IME");
+        while (!stop_) {
+            // Own-process windows deliberately stay included: Atrium's Start
+            // menu takes the foreground (start_menu.cpp), and a language switch
+            // made while its search box has focus must still announce. This is
+            // safe because ImeWatch::Sample reseeds silently on any foreground
+            // change (window != window_ -> shown_ = status, no announcement), so
+            // focusing one of our windows can never fake a switch; only a real
+            // change within the same window announces.
+            HWND fg = GetForegroundWindow();
+            Sample* sample = nullptr;
+            if (fg) {
+                // Read the focus window's state (its thread can differ from the
+                // top-level window's in an Electron/WebView2/WinUI3 host); fall
+                // back to the top-level window when it answers nothing.
+                HWND focus = FocusWindow(fg);
+                // A stalled IME window is not asked every tick: its control
+                // messages would time out one after the other and hold this
+                // thread far past the probe's cadence. The identity alone is
+                // read until the backoff expires.
+                const bool askIme = GetTickCount64() >= retryAt_;
+                HWND queried = focus;
+                ImeStatus status = QueryImeStatus(queried, askIme);
+                if (status.empty() && focus != fg) {
+                    queried = fg;
+                    status = QueryImeStatus(queried, askIme);
+                }
+                // The foreground and its focus can move while the IME is asked
+                // (two reads of a window that is no longer in front describe
+                // nothing): the sample is dropped, and the next tick reads the
+                // window that is actually there. (The island's input.rs rechecks
+                // both after its read.)
+                if (fg == GetForegroundWindow() && FocusWindow(fg) == focus) {
+                    const DWORD thread = GetWindowThreadProcessId(queried, nullptr);
+                    if (askIme) {
+                        const ULONGLONG now = GetTickCount64();
+                        if (!status.empty() && status.ime && !status.reliable) {
+                            retryAt_ = now + kImeRetryMs;
+                            if (!stalled_) {
+                                stalled_ = true;
+                                if (now - stallLogAt_ > 10000) {
+                                    stallLogAt_ = now;
+                                    Log(L"ime: the input method window does not answer; its last state is carried");
+                                }
+                            }
+                        } else if (!status.empty()) {
+                            retryAt_ = 0;
+                            if (stalled_) {
+                                stalled_ = false;
+                                if (now - stallLogAt_ > 10000) {
+                                    stallLogAt_ = now;
+                                    Log(L"ime: the input method window answers again");
+                                }
+                            }
+                        }
+                    }
+                    if (!status.reliable && cached_.valid && cached_.foreground == fg && cached_.thread == thread &&
+                        cached_.status.layout == status.layout)
+                        ImeCarryForward(status, cached_.status);
+                    if (!status.empty()) {
+                        if (status.reliable) {
+                            cached_.foreground = fg;
+                            cached_.thread = thread;
+                            cached_.status = status;
+                            cached_.valid = true;
+                        }
+                        sample = new Sample{fg, thread, std::move(status)};
+                    }
+                }
+            }
+            // A null sample still beats: the bubble's watchdog listens to it.
+            if (!PostMessageW(host_, WM_IME_STATE, 0, reinterpret_cast<LPARAM>(sample)) && sample)
+                delete sample;
+            Sleep(kImeProbeMs);
+        }
+    }
+
+    HWND host_;
+    std::atomic<bool> stop_{false};
+    std::thread thread_;
+    Cached cached_;
+    ULONGLONG retryAt_ = 0; // while an IME window stalls: when to ask it fully again
+    ULONGLONG stallLogAt_ = 0; // the last stall log: a flapping IME window is not worth a line each time
+    bool stalled_ = false;  // for one log line per entry, not one per tick
 };
 
 struct App {
@@ -117,6 +263,11 @@ struct App {
     std::unique_ptr<SystemChrome> chrome;
     std::unique_ptr<GlassMenu> menu;
     std::unique_ptr<WindowPreview> preview;
+    std::unique_ptr<ImeBubble> ime; // the input method bubble (issue #56, demo)
+    std::unique_ptr<ImeProbe> imeProbe; // reads the foreground's input method off the UI thread
+    ImeWatch imeWatch;              // what actually announces: settled states, one window at a time
+    bool imeBubbleGamePause = true; // the bubble stays quiet over a fullscreen game
+    std::vector<std::wstring> imeNoBubbleGames; // the effective no-bubble list, synced from the Stage list
     std::unique_ptr<StageManager> stage;
     std::unique_ptr<WinKey> winKey;
     HANDLE guard = nullptr; // the guard process (EnsureGuard)
@@ -285,6 +436,88 @@ void UpdateStatus()
     if (g_app.status)
         g_app.status->Refresh();
 }
+
+// The window in front is a game the no-bubble list knows and it truly fills its
+// screen (a maximized window fills only its work area): over it the bubble stays
+// quiet. The window's app key is lowered like TaskModel's — its process image
+// path.
+bool FullscreenGameInFront(HWND fg)
+{
+    if (!fg || !FillsScreen(fg))
+        return false;
+    DWORD pid = 0;
+    GetWindowThreadProcessId(fg, &pid);
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    wchar_t path[4096];
+    DWORD length = DWORD(std::size(path));
+    std::wstring key;
+    if (process && QueryFullProcessImageNameW(process, 0, path, &length))
+        key = LowerAppKey(std::wstring(path, length));
+    if (process)
+        CloseHandle(process);
+    return ImeBubbleMuted(g_app.imeBubbleGamePause, g_app.imeNoBubbleGames, key);
+}
+
+// What a settled state announces: the bar's status icon while it is up, the
+// bubble at the bottom of the display while the bar there is hidden. Only a
+// state that settles announces (ImeWatch: not a CapsLock flip that came and
+// went, not a stalled IME window, not another app's remembered layout).
+void AnnounceIme(HWND foreground, const ImeStatus& state)
+{
+    const HMONITOR monitor = MonitorFromWindow(foreground, MONITOR_DEFAULTTONEAREST);
+    Bar* bar = g_app.bar && g_app.bar->Monitor() == monitor ? g_app.bar.get() : nullptr;
+    if (!bar)
+        for (const auto& secondary : g_app.secondaryBars)
+            if (secondary->Monitor() == monitor) {
+                bar = secondary.get();
+                break;
+            }
+    if (!g_app.barOn.value_or(true))
+        return; // the bar is off with Windows' taskbar back: it shows its own
+    if (bar && bar->ShownOnScreen()) {
+        // The bar is up: the announcement happens in its status icon (the
+        // connection symbol steps aside for the language and comes back).
+        bar->AnnounceIme(ImeGlyph(state));
+        Log(L"ime: %s %s, %s (layout %08lX) in the status icon", ImeGlyph(state).c_str(),
+            state.ime && state.open ? L"composing" : L"direct input", state.ime && state.native ? L"native" : L"alphanumeric",
+            state.layout);
+        return;
+    }
+    MONITORINFO info{sizeof(info)};
+    if (!GetMonitorInfoW(monitor, &info))
+        return;
+    if (FullscreenGameInFront(foreground)) {
+        Log(L"ime: %s %s, %s (layout %08lX) kept quiet over the fullscreen game", ImeGlyph(state).c_str(),
+            state.ime && state.open ? L"composing" : L"direct input", state.ime && state.native ? L"native" : L"alphanumeric",
+            state.layout);
+        return;
+    }
+    g_app.ime->Show(state, info.rcWork, float(g_app.displaySettings.margin), int(info.rcMonitor.bottom));
+    Log(L"ime: %s %s, %s (layout %08lX) as the bubble", ImeGlyph(state).c_str(),
+        state.ime && state.open ? L"composing" : L"direct input", state.ime && state.native ? L"native" : L"alphanumeric",
+        state.layout);
+}
+
+void OnImeState(LPARAM l)
+{
+    std::unique_ptr<ImeProbe::Sample> sample(reinterpret_cast<ImeProbe::Sample*>(l));
+    if (g_app.ime)
+        g_app.ime->Watch(ClockMs()); // a stalled bubble takes itself down
+    if (!sample || !g_app.ime)
+        return;
+    ImeStatus status = std::move(sample->status);
+    // The case is read here, on the message-pumping UI thread: CapsLock's
+    // toggle lives in a thread's key state, and only a pumping thread sees it
+    // (the probe thread's GetAsyncKeyState low bit is just a "pressed" pulse).
+    // Shift's key-down is global and read asynchronously.
+    const bool caps = (GetKeyState(VK_CAPITAL) & 0x0001) != 0;
+    status.caps = caps;
+    status.upper = caps != ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0);
+    const double now = ClockMs();
+    if (g_app.imeWatch.Sample(sample->foreground, status, now))
+        AnnounceIme(sample->foreground, g_app.imeWatch.state());
+}
+
 
 // Atrium's tray panel and control centre open above their entries on the
 // bar; a click on the entry while one is open closes it (and must not reopen
@@ -577,6 +810,54 @@ void ApplySettings(const Settings& s)
     g_app.start->SetPreferredIcon(s.startIcon);
     g_app.notes->SetRadius(radius);
     g_app.notes->SetOptions(s.notifyTimeout, s.notifyHideBody, s.notifyPlacement);
+    // The input method announcements' dwells are the user's (issue #56).
+    g_app.imeWatch.SetSettle(unsigned(std::clamp(s.imeStateSettleMs, 0.0, 2000.0)),
+                              unsigned(std::clamp(s.imeCaseSettleMs, 0.0, 2000.0)));
+    // The bubble's feel is the user's too: the hit's compression, the spring's
+    // rebound, the liquid wobble's amplitude and rhythm, its lifetime, its size
+    // (the first bubble's and ten merges'), where the two kinds of bubble are
+    // born and the newcomer's three acts.
+    ImeBubbleTuning tuning;
+    tuning.compression = float(s.imeCompression);
+    tuning.rebound = float(s.imeRebound);
+    tuning.wobbleAmp = float(s.imeWobbleAmp);
+    tuning.wobbleHz = float(s.imeWobbleHz);
+    tuning.lifeMs = float(s.imeBubbleLifeMs);
+    tuning.firstBirthDip = float(s.imeFirstBirthDip);
+    tuning.lobeBirthDip = float(s.imeLobeBirthDip);
+    tuning.lobeRiseMs = float(s.imeLobeRiseMs);
+    tuning.lobeAttachMs = float(s.imeLobeAttachMs);
+    tuning.lobeSwallowMs = float(s.imeLobeSwallowMs);
+    tuning.startRadius = float(s.imeBubbleStartRadius);
+    tuning.endRadius = float(s.imeBubbleEndRadius);
+    g_app.ime->SetTuning(tuning);
+    // Over a fullscreen game the bubble stays quiet by default, and the no-bubble
+    // list follows the Stage list at once, before the file is saved.
+    g_app.imeBubbleGamePause = s.imeBubbleGamePause;
+    g_app.imeNoBubbleGames = SyncNoBubbleGames(s.imeNoBubbleGames, s.imeNoBubblePinned, s.stageExcluded);
+    // Windows 11 shows its own input-switch flyout for Win+Space. Two Toggle
+    // values hide it while the switching (and its hotkeys) stay; written when
+    // the setting is on, removed when it is off, and only on a real change.
+    static int lastImePopup = -1;
+    if (lastImePopup != int(s.imeHideSwitchPopup)) {
+        lastImePopup = int(s.imeHideSwitchPopup);
+        HKEY key = nullptr;
+        if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Keyboard Layout\\Toggle", 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
+            Log(L"ime: could not open Keyboard Layout\\Toggle (%lu)", GetLastError());
+        } else {
+            if (s.imeHideSwitchPopup) {
+                const DWORD delay = 99999999, multi = 0; // the flyout waits ~forever, never shows on a repeat
+                RegSetValueExW(key, L"HotkeyShowDelayInMS", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&delay), sizeof(delay));
+                RegSetValueExW(key, L"InputSwitcherShowOnMultiPress", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&multi), sizeof(multi));
+                Log(L"ime: the Windows input-switch flyout is hidden (Win + Space still switches)");
+            } else {
+                RegDeleteValueW(key, L"HotkeyShowDelayInMS");
+                RegDeleteValueW(key, L"InputSwitcherShowOnMultiPress");
+                Log(L"ime: the Windows input-switch flyout is Windows' own again");
+            }
+            RegCloseKey(key);
+        }
+    }
     // Notification cards belong to the bar (its bell): without it, Windows shows its own banners.
     // Also for the chat apps' own Windows notifications (QQ's), each by its own switch.
     const bool toasts = s.notifyListener || s.notifyQQ || s.notifyWeChat || s.notifyFeishu || s.notifyWeCom || s.notifyDingTalk;
@@ -1232,6 +1513,9 @@ LRESULT CALLBACK HostProc(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_OPEN_SETTINGS:
         OpenSettings();
         return 0;
+    case WM_IME_STATE:
+        OnImeState(l);
+        return 0;
     case WM_WIN_KEY:
         if (!g_app.barOn.value_or(true))
             return 0;
@@ -1654,6 +1938,17 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR cmdLine, int)
     ChangeWindowMessageFilterEx(g_app.host, g_app.taskbarCreated, MSGFLT_ALLOW, nullptr);
 
     Settings settings = LoadSettings();
+    // The no-bubble list starts as a copy of the Stage Manager list; later starts
+    // only ever add a new stage entry, never take one back.
+    {
+        std::vector<std::wstring> synced = SyncNoBubbleGames(settings.imeNoBubbleGames, settings.imeNoBubblePinned, settings.stageExcluded);
+        if (synced != settings.imeNoBubbleGames) {
+            settings.imeNoBubbleGames = std::move(synced);
+            std::wstring warning, error;
+            if (!SaveSettings(settings, &warning, &error))
+                Log(L"ime: could not save the no-bubble list: %s", error.c_str());
+        }
+    }
     SetLanguage(settings.language);
     // Also on every start while it is on: an update from a version that started from the
     // Run key moves to the logon task, unless that entry was turned off in Task Manager.
@@ -1752,6 +2047,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR cmdLine, int)
     };
     // Pointer on an app with windows: its windows, previewed above it (as the Windows taskbar).
     g_app.preview = std::make_unique<WindowPreview>(instance);
+    g_app.ime = std::make_unique<ImeBubble>(instance); // the input method bubble (issue #56, demo)
+    g_app.imeProbe = std::make_unique<ImeProbe>(g_app.host); // it reads the foreground's state off this thread
     ConfigureBar(*g_app.bar);
     g_app.displaysReady = true;
     ApplySettings(settings);
@@ -1797,6 +2094,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR cmdLine, int)
         DispatchMessageW(&msg);
     }
     g_app.displaysReady = false;
+    g_app.imeProbe.reset(); // its samples would outlive their window otherwise
     // First the render thread, while every window it draws for is still there; a driver call stuck
     // in the desktop duplication (it holds the shared device) must not keep Atrium from exiting:
     // the system taskbar comes back and the process ends.
