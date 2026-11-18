@@ -201,7 +201,9 @@ void ReadImeState()
         ImeCarryForward(status, g_app.imeLast);
     if (status.reliable && !status.empty())
         g_app.imeLast = status;
-    const bool caps = (GetKeyState(VK_CAPITAL) & 0x0001) != 0;
+    // The latch comes from the keyboard hook (the host thread's own GetKeyState
+    // can be stale); Shift's key-down is global and read asynchronously.
+    const bool caps = g_app.imeWatcher->CapsLock();
     status.caps = caps;
     status.upper = caps != ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0);
     if (g_app.imeWatch.Update(foreground, status)) {

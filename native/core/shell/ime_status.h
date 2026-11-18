@@ -94,6 +94,10 @@ public:
     ImeWatcher(const ImeWatcher&) = delete;
     ImeWatcher& operator=(const ImeWatcher&) = delete;
 
+    // CapsLock's latch, kept from the keyboard hook: a background thread's
+    // GetKeyState can stay stale, while the low-level hook sees every press.
+    bool CapsLock() const { return caps_; }
+
 private:
     static void CALLBACK OnWinEvent(HWINEVENTHOOK hook, DWORD event, HWND window, LONG object, LONG child, DWORD thread, DWORD time);
     static LRESULT CALLBACK OnKey(int code, WPARAM wparam, LPARAM lparam);
@@ -104,7 +108,8 @@ private:
     HWINEVENTHOOK foreground_ = nullptr;
     HWINEVENTHOOK ime_ = nullptr;
     HHOOK keyboard_ = nullptr;
-    bool notified_ = false; // one message in flight is enough; the read sees the newest state
+    bool caps_ = false;     // CapsLock's latch (seeded once, flipped by its presses)
+    bool capsDown_ = false; // the key is held: its repeat does not flip the latch again
 };
 
 // What an announcement reacts to. A polled state alone is not news: focusing

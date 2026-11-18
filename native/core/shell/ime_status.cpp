@@ -82,6 +82,7 @@ ImeStatus QueryImeStatus(HWND foreground, bool askIme)
 ImeWatcher::ImeWatcher(HWND window, UINT message) : window_(window), message_(message)
 {
     g_watcher = this;
+    caps_ = (GetKeyState(VK_CAPITAL) & 0x0001) != 0; // the latch already on; every press flips it
     foreground_ = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr, OnWinEvent, 0, 0, WINEVENT_OUTOFCONTEXT);
     ime_ = SetWinEventHook(EVENT_OBJECT_IME_SHOW, EVENT_OBJECT_IME_CHANGE, nullptr, OnWinEvent, 0, 0, WINEVENT_OUTOFCONTEXT);
     keyboard_ = SetWindowsHookExW(WH_KEYBOARD_LL, OnKey, GetModuleHandleW(nullptr), 0);
@@ -114,9 +115,20 @@ void CALLBACK ImeWatcher::OnWinEvent(HWINEVENTHOOK, DWORD event, HWND, LONG, LON
 
 LRESULT CALLBACK ImeWatcher::OnKey(int code, WPARAM wparam, LPARAM lparam)
 {
-    if (code == HC_ACTION && g_watcher && (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN)) {
+    const bool up = wparam == WM_KEYUP || wparam == WM_SYSKEYUP, down = wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN;
+    if (code == HC_ACTION && g_watcher && (up || down)) {
         const KBDLLHOOKSTRUCT* key = reinterpret_cast<const KBDLLHOOKSTRUCT*>(lparam);
         const DWORD vk = key->vkCode;
+        if (vk == VK_CAPITAL) {
+            // The latch, kept here: every press flips it once (its repeat does
+            // not), whether or not this thread's GetKeyState would see it.
+            if (up) {
+                g_watcher->capsDown_ = false;
+            } else if (!g_watcher->capsDown_) {
+                g_watcher->capsDown_ = true;
+                g_watcher->caps_ = !g_watcher->caps_;
+            }
+        }
         const bool caseKey = vk == VK_SHIFT || vk == VK_LSHIFT || vk == VK_RSHIFT || vk == VK_CAPITAL;
         const bool switchKey = vk == VK_SPACE && ((GetAsyncKeyState(VK_LWIN) | GetAsyncKeyState(VK_RWIN) | GetAsyncKeyState(VK_CONTROL)) & 0x8000) != 0;
         const bool imeKey = vk == VK_KANA || vk == VK_KANJI || vk == VK_HANGUL || vk == VK_HANJA;
@@ -124,7 +136,7 @@ LRESULT CALLBACK ImeWatcher::OnKey(int code, WPARAM wparam, LPARAM lparam)
         // key is already up when the replay arrives, so the combination above
         // no longer sees it.
         const bool replay = vk == VK_SPACE && (key->flags & LLKHF_INJECTED) != 0;
-        if (caseKey || switchKey || imeKey || replay)
+        if (down && (caseKey || switchKey || imeKey || replay))
             g_watcher->Notify();
     }
     return CallNextHookEx(nullptr, code, wparam, lparam);
