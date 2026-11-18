@@ -275,6 +275,19 @@ bool BarPainter::Animate(const BarScene& scene, double nowMs)
         }
     }
 
+    // The input method announcement (issue #56): the status entry's symbol
+    // steps aside for the language glyph and comes back — one pass per state
+    // change, timed from the announcement's start. A switch while the previous
+    // glyph is still showing crossfades the two glyphs instead of bringing the
+    // symbol back between them.
+    {
+        const ImeSwapFrame swap = scene.imeMs > 0 && !scene.imeGlyph.empty() ? ImeSwapAt(nowMs - scene.imeMs, scene.imeContinued) : ImeSwapFrame{};
+        imeOut_ = swap.out;
+        imeIn_ = swap.in;
+        imePrev_ = swap.prev * scene.imePrevAlpha;
+        moving |= swap.running;
+    }
+
     // Auto-hide slide.
     if (scene.tucked != slideDown_) {
         slideDown_ = scene.tucked;
@@ -535,9 +548,9 @@ void BarPainter::DrawItem(ID2D1DeviceContext2* d2d, const BarScene& scene, const
     if (it.key == L"#status") {
         bool darkInk = ink.r < 0.5f;
         if (scene.statusIcons)
-            DrawStatusIcons(d2d, scene.status, iconArea, brush, ink, darkInk);
+            DrawStatusIcons(d2d, scene.status, scene.imeGlyph, scene.imePrevGlyph, iconArea, brush, ink, darkInk);
         else
-            DrawStatus(d2d, scene.status, iconArea, brush, ink, darkInk);
+            DrawStatus(d2d, scene.status, scene.imeGlyph, scene.imePrevGlyph, iconArea, brush, ink, darkInk);
         d2d->SetTransform(D2D1::Matrix3x2F::Identity());
         return;
     }
@@ -613,11 +626,14 @@ void BarPainter::DrawItem(ID2D1DeviceContext2* d2d, const BarScene& scene, const
 // symbol on it. Wi-Fi is a fan of three arcs over a dot, as many lit as the
 // signal is strong; a plug when wired; the fan dim when offline. The battery
 // and the volume are in the control centre.
-void BarPainter::DrawStatus(ID2D1DeviceContext2* d2d, const SystemStatus& st, D2D1_RECT_F r, ID2D1SolidColorBrush* brush, D2D1_COLOR_F ink,
-                            bool darkInk)
+void BarPainter::DrawStatus(ID2D1DeviceContext2* d2d, const SystemStatus& st, const std::wstring& ime, const std::wstring& imePrev, D2D1_RECT_F r,
+                            ID2D1SolidColorBrush* brush, D2D1_COLOR_F ink, bool darkInk)
 {
     const float h = std::min(r.right - r.left, r.bottom - r.top), cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
     const StatusMotion& sm = statusMotion_;
+    // The announcement's glyph takes the connection symbol's place; the ring
+    // (battery, volume, brightness) stays where it is.
+    const float landed = 1 - imeOut_;
     auto dim = [&](float a) {
         D2D1_COLOR_F c = ink;
         c.a *= a;
@@ -674,7 +690,19 @@ void BarPainter::DrawStatus(ID2D1DeviceContext2* d2d, const SystemStatus& st, D2
 
     const bool ring = st.battery || st.audio || sm.brightMix > 0.003f;
     if (!ring) { // nothing to measure: the fan alone, full size
-        connection(h, 1);
+        connection(h, landed);
+        if ((imeIn_ > 0.003f && !ime.empty()) || (imePrev_ > 0.003f && !imePrev.empty()))
+            if (IDWriteTextFormat* f = Format(h * 0.52f, DWRITE_FONT_WEIGHT_SEMI_BOLD)) {
+                const D2D1_RECT_F box = D2D1::RectF(cx - h / 2, cy - h / 2, cx + h / 2, cy + h / 2);
+                if (imePrev_ > 0.003f && !imePrev.empty()) {
+                    brush->SetColor(fade(ink, imePrev_));
+                    d2d->DrawText(imePrev.c_str(), UINT32(imePrev.size()), f, box, brush);
+                }
+                if (imeIn_ > 0.003f && !ime.empty()) {
+                    brush->SetColor(fade(ink, imeIn_));
+                    d2d->DrawText(ime.c_str(), UINT32(ime.size()), f, box, brush);
+                }
+            }
         return;
     }
     // The ring: open at the bottom like the iPhone's, filled clockwise from
@@ -721,7 +749,7 @@ void BarPainter::DrawStatus(ID2D1DeviceContext2* d2d, const SystemStatus& st, D2
 
     // Inside: the connection, or the speaker or the sun while a level shows.
     const float speaker = st.battery ? sm.volumeMix : 0.f;
-    connection(h * 0.6f, 1 - std::min(1.f, speaker + sm.brightMix));
+    connection(h * 0.6f, landed * (1 - std::min(1.f, speaker + sm.brightMix)));
     auto symbol = [&](const wchar_t* glyph, float alpha) {
         if (alpha <= 0.003f)
             return;
@@ -731,8 +759,22 @@ void BarPainter::DrawStatus(ID2D1DeviceContext2* d2d, const SystemStatus& st, D2
         }
     };
     const wchar_t* volumeGlyph = st.muted || st.volume == 0 ? L"\uE74F" : st.volume < 34 ? L"\uE993" : st.volume < 67 ? L"\uE994" : L"\uE995";
-    symbol(volumeGlyph, speaker);
-    symbol(L"\uE706", sm.brightMix);
+    symbol(volumeGlyph, speaker * landed);
+    symbol(L"\uE706", sm.brightMix * landed);
+    // The announcement's glyph where the connection symbol was, in the ring;
+    // in a continued swap the outgoing glyph fades out on the same spot.
+    if ((imeIn_ > 0.003f && !ime.empty()) || (imePrev_ > 0.003f && !imePrev.empty()))
+        if (IDWriteTextFormat* f = Format(h * 0.44f, DWRITE_FONT_WEIGHT_SEMI_BOLD)) {
+            const D2D1_RECT_F box = D2D1::RectF(cx - h / 2, cy - h / 2, cx + h / 2, cy + h / 2);
+            if (imePrev_ > 0.003f && !imePrev.empty()) {
+                brush->SetColor(fade(ink, imePrev_));
+                d2d->DrawText(imePrev.c_str(), UINT32(imePrev.size()), f, box, brush);
+            }
+            if (imeIn_ > 0.003f && !ime.empty()) {
+                brush->SetColor(fade(ink, imeIn_));
+                d2d->DrawText(ime.c_str(), UINT32(ime.size()), f, box, brush);
+            }
+        }
 
     // No battery (a desktop): the ring is the volume, so its gap holds a small speaker where a
     // laptop's bolt would be (gone while the brightness shows).
@@ -745,11 +787,12 @@ void BarPainter::DrawStatus(ID2D1DeviceContext2* d2d, const SystemStatus& st, D2
         }
 }
 
-void BarPainter::DrawStatusIcons(ID2D1DeviceContext2* d2d, const SystemStatus& st, D2D1_RECT_F r, ID2D1SolidColorBrush* brush, D2D1_COLOR_F ink,
-                                 bool darkInk)
+void BarPainter::DrawStatusIcons(ID2D1DeviceContext2* d2d, const SystemStatus& st, const std::wstring& ime, const std::wstring& imePrev, D2D1_RECT_F r,
+                                 ID2D1SolidColorBrush* brush, D2D1_COLOR_F ink, bool darkInk)
 {
     const bool vertical = r.bottom - r.top > r.right - r.left;
     const float h = vertical ? r.right - r.left : r.bottom - r.top, cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+    const float landed = 1 - imeOut_; // the announcement's glyph takes the network icon's place
     auto fade = [](D2D1_COLOR_F c, float a) {
         c.a *= a;
         return c;
@@ -768,13 +811,25 @@ void BarPainter::DrawStatusIcons(ID2D1DeviceContext2* d2d, const SystemStatus& s
         const float nx = vertical ? cx - netW / 2 : x, ny = vertical ? y : cy;
         if (st.connected && !st.wifi) {
             if (IDWriteTextFormat* f = Format(h * 0.62f, DWRITE_FONT_WEIGHT_NORMAL, IconFontFamily())) {
-                brush->SetColor(ink);
+                brush->SetColor(fade(ink, landed));
                 d2d->DrawText(L"\uE839", 1, f, D2D1::RectF(nx - h, ny - h / 2, nx + netW + h, ny + h / 2), brush);
             }
         } else {
             const int lit = !st.connected ? -1 : WifiSteps(st.signal);
-            DrawWifiFan(d2d, brush, nx + netW / 2, ny, h * 0.46f, lit, ink, fade(ink, lit < 0 ? 0.32f : 0.24f));
+            DrawWifiFan(d2d, brush, nx + netW / 2, ny, h * 0.46f, lit, fade(ink, landed), fade(ink, (lit < 0 ? 0.32f : 0.24f) * landed));
         }
+        if ((imeIn_ > 0.003f && !ime.empty()) || (imePrev_ > 0.003f && !imePrev.empty()))
+            if (IDWriteTextFormat* f = Format(h * 0.55f, DWRITE_FONT_WEIGHT_SEMI_BOLD)) {
+                const D2D1_RECT_F box = D2D1::RectF(nx, ny - h / 2, nx + netW, ny + h / 2);
+                if (imePrev_ > 0.003f && !imePrev.empty()) {
+                    brush->SetColor(fade(ink, imePrev_));
+                    d2d->DrawText(imePrev.c_str(), UINT32(imePrev.size()), f, box, brush);
+                }
+                if (imeIn_ > 0.003f && !ime.empty()) {
+                    brush->SetColor(fade(ink, imeIn_));
+                    d2d->DrawText(ime.c_str(), UINT32(ime.size()), f, box, brush);
+                }
+            }
         x += netW + gap;
         y += stepY;
     }

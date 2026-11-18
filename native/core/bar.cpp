@@ -9,6 +9,7 @@
 #include "render/capture.h"
 #include "render/desktop_backdrop.h"
 #include "render/glass_renderer.h"
+#include "render/ime_swap.h"
 #include "render/ui_font.h"
 #include "ui/surface.h"
 
@@ -1719,6 +1720,24 @@ void Bar::SetStatus(const SystemStatus& status)
     scene_.status = status;
     Publish();
     UpdateTooltips();
+}
+
+void Bar::AnnounceIme(const std::wstring& glyph)
+{
+    if (glyph.empty())
+        return;
+    // A switch while the previous glyph is still on screen crossfades from it
+    // instead of restarting the handshake, whose first step would flash the
+    // connection symbol back between the two glyphs.
+    const double now = ClockMs();
+    const double elapsed = now - scene_.imeMs;
+    const bool continued = !scene_.imeGlyph.empty() && scene_.imeMs > 0 && ImeSwapShowing(elapsed);
+    scene_.imeContinued = continued;
+    scene_.imePrevGlyph = continued ? scene_.imeGlyph : std::wstring();
+    scene_.imePrevAlpha = continued ? ImeSwapAt(elapsed).in : 0.f;
+    scene_.imeGlyph = glyph;
+    scene_.imeMs = now;
+    Publish(); // content only: the glass does not change
 }
 
 void Bar::SetUnread(int count)

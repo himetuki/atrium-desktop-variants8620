@@ -19,6 +19,10 @@ Require(parsed.NearEnter == 40 && parsed.NearLeave == 4,
 Require(BarSettings.FromJson(JsonNode.Parse("""{"nearLeave":4}""")!.AsObject(), new()).NearLeave == 4,
     "A partial four-DIP leave update must not be replaced with the default forty-eight.");
 Require(BarSettings.FromJson(new JsonObject(), new()).SameAs(new()), "Old files must receive display defaults.");
+Require(new BarSettings().ImeStatus, "The input method status is on by default.");
+var imeOff = BarSettings.FromJson(JsonNode.Parse("""{"imeStatus":false}""")!.AsObject(), new());
+Require(!imeOff.ImeStatus && !new BarSettings().SameAs(imeOff) && !BarSettings.FromJson(imeOff.ToJson(), new()).ImeStatus,
+    "Turning the input method status off must be saved, compared and survive a round trip.");
 Require(!BarSettings.FromJson(new JsonObject(), new()).HoverRise, "Old files must keep the glass flat.");
 Require(BarSettings.FromJson(new JsonObject(), new() { HoverRise = true }).HoverRise, "Partial updates must retain enabled hover rise.");
 Require(!BarSettings.FromJson(new JsonObject(), settings).HoverRise, "Partial updates must retain disabled hover rise.");

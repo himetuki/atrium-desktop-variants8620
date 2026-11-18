@@ -829,6 +829,7 @@ public sealed partial class MainWindow : Window
         UpdateRiseNearDependent();
         RunningSwitch.IsOn = _current.ShowRunning;
         HideBodySwitch.IsOn = _current.NotifyHideBody;
+        ImeStatusSwitch.IsOn = _current.ImeStatus;
         bool notifyCorner = BarSettings.NotifyCorners.Contains(_current.NotifyPlacement);
         if (notifyCorner) _notifyCorner = _current.NotifyPlacement;
         (notifyCorner ? NotifyAtCorner : NotifyAtDock).IsChecked = true;
@@ -1026,6 +1027,13 @@ public sealed partial class MainWindow : Window
     {
         if (_loading) return;
         _current.NotifyHideBody = HideBodySwitch.IsOn;
+        Changed();
+    }
+
+    private void OnImeStatusToggled(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _current.ImeStatus = ImeStatusSwitch.IsOn;
         Changed();
     }
 

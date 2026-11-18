@@ -77,6 +77,7 @@ internal sealed class BarSettings
     public string NotifyPlacement { get; set; } = "dock"; // dock (default) | topLeft | topRight | bottomLeft | bottomRight
     public static readonly string[] NotifyCorners = { "topLeft", "topRight", "bottomLeft", "bottomRight" };
     public bool NotifyHideBody { get; set; }           // privacy: no message text, excluded from capture
+    public bool ImeStatus { get; set; } = true;        // the status icon shows the foreground window's input language
     public bool NotifyListener { get; set; } = true;   // Windows notifications as Atrium cards
     public bool NotifyFeishu { get; set; } = true;     // Feishu messages as Atrium cards (its own popup, read only)
     public bool NotifyWeChat { get; set; } = true;     // WeChat messages as Atrium cards (its chat list, read only)
@@ -193,6 +194,7 @@ internal sealed class BarSettings
             ["notifyTimeout"] = NotifyTimeout,
             ["notifyPlacement"] = NotifyPlacement,
             ["notifyHideBody"] = NotifyHideBody,
+            ["imeStatus"] = ImeStatus,
             ["notifyListener"] = NotifyListener,
             ["notifyWeChat"] = NotifyWeChat,
             ["notifyFeishu"] = NotifyFeishu,
@@ -286,6 +288,7 @@ internal sealed class BarSettings
         s.ShowRunning = Flag("showRunning", f.ShowRunning);
         s.NotifyTimeout = Math.Clamp(Num("notifyTimeout", f.NotifyTimeout), 3, 30);
         s.NotifyHideBody = Flag("notifyHideBody", f.NotifyHideBody);
+        s.ImeStatus = Flag("imeStatus", f.ImeStatus);
         // Version 1 files saved the old default (off): from version 2 it is on (as in the core).
         bool v1 = o?["version"] is JsonValue ver && ver.TryGetValue(out double vn) && vn < 2;
         s.NotifyListener = v1 ? f.NotifyListener : Flag("notifyListener", f.NotifyListener);
@@ -374,7 +377,7 @@ internal sealed class BarSettings
         ShowClockSeconds == o.ShowClockSeconds &&
         ShowTray == o.ShowTray && TrayHost == o.TrayHost && StartTray == o.StartTray && StartStatus == o.StartStatus && StartCentered == o.StartCentered && StartWithBar == o.StartWithBar && StartSize == o.StartSize && StartIcon == o.StartIcon &&
         ShowStatus == o.ShowStatus && ShowNotifications == o.ShowNotifications && ShowDesktop == o.ShowDesktop &&
-        ShowRunning == o.ShowRunning && TextColor == o.TextColor && Language == o.Language && AutoHide == o.AutoHide && BarEdge == o.BarEdge && StatusStyle == o.StatusStyle && NotifyTimeout == o.NotifyTimeout && NotifyHideBody == o.NotifyHideBody &&
+        ShowRunning == o.ShowRunning && TextColor == o.TextColor && Language == o.Language && AutoHide == o.AutoHide && BarEdge == o.BarEdge && StatusStyle == o.StatusStyle && NotifyTimeout == o.NotifyTimeout && NotifyHideBody == o.NotifyHideBody && ImeStatus == o.ImeStatus &&
         NotifyListener == o.NotifyListener && NotifyWeChat == o.NotifyWeChat && NotifyFeishu == o.NotifyFeishu &&
         NotifyQQ == o.NotifyQQ && NotifyWeCom == o.NotifyWeCom && NotifyDingTalk == o.NotifyDingTalk && AttentionLight == o.AttentionLight && AttentionBounce == o.AttentionBounce && Bar == o.Bar && Widgets == o.Widgets &&
         WidgetsOnRight == o.WidgetsOnRight && WidgetBackdrop == o.WidgetBackdrop && StageManager == o.StageManager && StageOnRight == o.StageOnRight &&

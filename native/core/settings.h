@@ -81,6 +81,7 @@ struct Settings {
     double notifyTimeout = 6;        // seconds a popup stays (3..30)
     std::wstring notifyPlacement = L"dock"; // dock (default) | topLeft | topRight | bottomLeft | bottomRight (the main screen's)
     bool notifyHideBody = false;     // privacy: no message text; cards excluded from screen capture
+    bool imeStatus = true;           // the status icon shows the foreground window's input language (issue #56)
     bool notifyListener = true;      // Windows notifications as Atrium cards (UserNotificationListener)
     bool notifyFeishu = true;        // Feishu messages as Atrium cards (its own popup, read through UI Automation)
     bool notifyWeChat = true;        // WeChat messages as Atrium cards (its chat list, read through UI Automation)

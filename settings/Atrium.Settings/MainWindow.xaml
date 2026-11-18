@@ -805,6 +805,9 @@
                                         <RadioButton x:Name="StatusIcons" GroupName="statusstyle" Content="Icons" Tag="icons" Style="{StaticResource SegmentStyle}" Checked="OnStatusStyleChecked" />
                                     </local:SegmentTrack>
                                 </StackPanel>
+                                <local:ToggleTile x:Name="ImeStatusSwitch" Title="Input method status"
+                                                  Note="The status icon shows the language the foreground window types in (中/あ/가, or a/A for Latin) and the CapsLock case."
+                                                  SwitchName="Input method status" Toggled="OnImeStatusToggled" Flat="True" />
                             </StackPanel>
                         </StackPanel>
 

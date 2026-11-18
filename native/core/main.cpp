@@ -18,6 +18,7 @@
 #include "shell/task_model.h"
 #include "shell/notification_listener.h"
 #include "shell/system_chrome.h"
+#include "shell/ime_status.h"
 #include "shell/system_status.h"
 #include "shell/tray_model.h"
 #include "shell/usb_volume.h"
@@ -70,10 +71,12 @@ constexpr UINT WM_STATUS = WM_APP + 10;       // lParam: SystemStatus*, read off
 constexpr UINT WM_UPDATE_READY = WM_APP + 11; // background package is validated and ready
 constexpr UINT WM_WIN_KEY = WM_APP + 12;      // the Windows key alone (wParam 0, winKeyStart), Win + 1..9, 0 (1..10, winNumbers)
 constexpr UINT WM_USB = WM_APP + 13;          // the device worker has queued removal notices
+constexpr UINT WM_IME_STATE = WM_APP + 20;    // the input method may have changed (ImeWatcher)
 constexpr UINT_PTR kStatusTimer = 0x52;       // the bar's status icon
 constexpr UINT_PTR kTrayFocusTimer = 0x53;    // after a forwarded tray click
 constexpr UINT_PTR kDisplaySettleTimer = 0x56; // once more after a display change, the topology settled
 constexpr UINT_PTR kMessengerTimer = 0x57;     // a chat app's flash: did a card with its text follow?
+constexpr UINT_PTR kImeTimer = 0x58;           // the input method events settled: read once
 constexpr UINT_PTR kReadyTimer = 0x54;       // only during an update startup handshake
 constexpr UINT kStatusMs = 3000;
 constexpr UINT kTrayId = 1;
@@ -119,6 +122,10 @@ struct App {
     std::unique_ptr<WindowPreview> preview;
     std::unique_ptr<StageManager> stage;
     std::unique_ptr<WinKey> winKey;
+    std::unique_ptr<ImeWatcher> imeWatcher; // the events that may change the input method (issue #56)
+    ImeWatch imeWatch;                     // what announces (a foreground change only reseeds it)
+    ImeStatus imeLast;                     // the last complete read: carried through a stalled one
+    bool imeOn = true;                     // the "show the input language" setting, as last applied
     HANDLE guard = nullptr; // the guard process (EnsureGuard)
     bool winKeyStart = false, winNumbers = false; // what it watches
     bool widgetsOn = false;
@@ -140,6 +147,68 @@ template<class Action> void ForBars(Action action)
     action(*g_app.bar);
     for (const auto& bar : g_app.secondaryBars)
         action(*bar);
+}
+
+// The focus window of the foreground thread (it can differ from the top-level
+// window in an Electron/WebView2/WinUI3 host): the IME state belongs to it.
+HWND FocusWindow(HWND foreground)
+{
+    if (!foreground)
+        return nullptr;
+    GUITHREADINFO info{sizeof(info)};
+    if (GetGUIThreadInfo(0, &info)) { // 0: the foreground thread's queue
+        if (HWND focus = info.hwndFocus ? info.hwndFocus : info.hwndActive)
+            return focus;
+    }
+    return foreground;
+}
+
+// A settled input method change shows in the status icon of the bar on the
+// foreground window's display. While the bar is hidden there is nothing to
+// show it (the bottom bubble is a separate change).
+void AnnounceIme(HWND foreground, const ImeStatus& status)
+{
+    const HMONITOR monitor = MonitorFromWindow(foreground, MONITOR_DEFAULTTONEAREST);
+    Bar* bar = g_app.bar && g_app.bar->Monitor() == monitor ? g_app.bar.get() : nullptr;
+    if (!bar)
+        for (const auto& secondary : g_app.secondaryBars)
+            if (secondary->Monitor() == monitor) {
+                bar = secondary.get();
+                break;
+            }
+    if (bar && bar->ShownOnScreen())
+        bar->AnnounceIme(ImeGlyph(status));
+}
+
+// The read an ImeWatcher event asks for: once, off the event, after the events
+// of a burst have settled. The foreground and its focus are rechecked around
+// it; a stalled IME window carries the last conversion state forward and never
+// announces.
+void ReadImeState()
+{
+    if (!g_app.imeOn || !g_app.imeWatcher)
+        return;
+    HWND foreground = GetForegroundWindow();
+    if (!foreground)
+        return;
+    const HWND focus = FocusWindow(foreground);
+    ImeStatus status = QueryImeStatus(focus);
+    if (status.empty() && focus != foreground)
+        status = QueryImeStatus(foreground);
+    if (foreground != GetForegroundWindow() || FocusWindow(foreground) != focus)
+        return; // the foreground moved while the IME was asked: not a state of anything
+    if (!status.reliable && !status.empty() && !g_app.imeLast.empty() && status.layout == g_app.imeLast.layout)
+        ImeCarryForward(status, g_app.imeLast);
+    if (status.reliable && !status.empty())
+        g_app.imeLast = status;
+    const bool caps = (GetKeyState(VK_CAPITAL) & 0x0001) != 0;
+    status.caps = caps;
+    status.upper = caps != ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0);
+    if (g_app.imeWatch.Update(foreground, status)) {
+        const ImeStatus& shown = g_app.imeWatch.state();
+        AnnounceIme(foreground, shown);
+        Log(L"ime: %s in the status icon (layout %08lX)", ImeGlyph(shown).c_str(), shown.layout);
+    }
 }
 
 void ConfigureBar(Bar& bar);
@@ -558,6 +627,21 @@ void ApplySettings(const Settings& s)
 {
     if (SetLanguage(s.language) && g_app.widgets)
         g_app.widgets->ReloadLanguage();
+    // The input method status: event hooks only while the setting is on. The
+    // first enable reads the state already in front, so the icon is right
+    // before the user changes anything.
+    g_app.imeOn = s.imeStatus;
+    if (g_app.imeOn && !g_app.imeWatcher) {
+        g_app.imeWatcher = std::make_unique<ImeWatcher>(g_app.host, WM_IME_STATE);
+        g_app.imeWatch.reset();
+        g_app.imeLast = ImeStatus{};
+        if (g_app.host)
+            SetTimer(g_app.host, kImeTimer, 1, nullptr);
+    } else if (!g_app.imeOn && g_app.imeWatcher) {
+        g_app.imeWatcher.reset();
+        g_app.imeWatch.reset();
+        g_app.imeLast = ImeStatus{};
+    }
     g_app.desktopDisplay = s.desktopDisplay;
     g_app.displaySettings = s;
     // Popups share the bar's material and corner radius (concentric inside).
@@ -1232,6 +1316,12 @@ LRESULT CALLBACK HostProc(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_OPEN_SETTINGS:
         OpenSettings();
         return 0;
+    case WM_IME_STATE:
+        // A burst of events (a switch fires the IME window's own change, a
+        // foreground change and the key) settles into one read.
+        if (g_app.imeOn)
+            SetTimer(h, kImeTimer, 60, nullptr);
+        return 0;
     case WM_WIN_KEY:
         if (!g_app.barOn.value_or(true))
             return 0;
@@ -1419,6 +1509,11 @@ LRESULT CALLBACK HostProc(HWND h, UINT m, WPARAM w, LPARAM l)
             UpdateStatus();
             if (g_app.chrome)
                 g_app.chrome->Enforce();
+            return 0;
+        }
+        if (w == kImeTimer) {
+            KillTimer(h, kImeTimer);
+            ReadImeState();
             return 0;
         }
         if (w == kMessengerTimer) {

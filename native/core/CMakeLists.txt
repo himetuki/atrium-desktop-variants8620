@@ -33,6 +33,7 @@ add_executable(atrium_core WIN32
     settings.cpp
     settings_server.cpp
     localization.cpp
+    shell/ime_status.cpp
     shell/task_model.cpp
     shell/app_processes.cpp
     shell/app_catalog.cpp

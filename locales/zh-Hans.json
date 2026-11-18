@@ -896,6 +896,8 @@
   "OK": "好",
   "Bottom": "底部",
   "Top": "顶部",
-  "Position": "位置"
+  "Position": "位置",
+  "Input method status": "输入法状态",
+  "The status icon shows the language the foreground window types in (中/あ/가, or a/A for Latin) and the CapsLock case.": "状态图标显示前台窗口正在使用的输入语言（中/あ/가，拉丁输入为 a/A）以及 CapsLock 的大小写状态。"
  }
 }

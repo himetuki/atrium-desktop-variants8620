@@ -137,6 +137,7 @@ std::wstring Settings::ToJson() const
     num(L"nearLeave", nearLeave);
     o.SetNamedValue(L"notifyPlacement", json::JsonValue::CreateStringValue(notifyPlacement));
     o.SetNamedValue(L"notifyHideBody", json::JsonValue::CreateBooleanValue(notifyHideBody));
+    o.SetNamedValue(L"imeStatus", json::JsonValue::CreateBooleanValue(imeStatus));
     o.SetNamedValue(L"notifyListener", json::JsonValue::CreateBooleanValue(notifyListener));
     o.SetNamedValue(L"notifyWeChat", json::JsonValue::CreateBooleanValue(notifyWeChat));
     o.SetNamedValue(L"notifyFeishu", json::JsonValue::CreateBooleanValue(notifyFeishu));
@@ -241,6 +242,7 @@ bool Settings::FromJson(const std::wstring& text, const Settings& base, Settings
     num(L"nearEnter", s.nearEnter);
     num(L"nearLeave", s.nearLeave);
     flag(L"notifyHideBody", s.notifyHideBody);
+    flag(L"imeStatus", s.imeStatus);
     // Version 1 saved the old default (off) along with everything else; from
     // version 2 the notifications are on unless turned off since.
     bool v1 = o.HasKey(L"version") && o.GetNamedValue(L"version").ValueType() == json::JsonValueType::Number && o.GetNamedNumber(L"version") < 2;
