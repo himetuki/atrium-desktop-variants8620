@@ -3,6 +3,7 @@
 #include "localization.h"
 #include "log.h"
 #include "shell/logon_task.h"
+#include "ui/ime_bubble_gate.h"
 
 #include <windows.h>
 #include <shlobj.h>
@@ -22,6 +23,28 @@
 namespace json = winrt::Windows::Data::Json;
 
 namespace atrium {
+
+namespace {
+
+// A list of app keys as it is kept: trimmed, no empty entries, and no two
+// spellings of the same key (the first one wins).
+void NormalizeAppList(std::vector<std::wstring>& entries)
+{
+    std::vector<std::wstring> kept;
+    kept.reserve(entries.size());
+    for (const std::wstring& raw : entries) {
+        std::wstring entry = TrimAppEntry(raw);
+        if (entry.empty())
+            continue;
+        const std::wstring lower = LowerAppKey(entry);
+        if (std::any_of(kept.begin(), kept.end(), [&](const std::wstring& other) { return LowerAppKey(other) == lower; }))
+            continue;
+        kept.push_back(std::move(entry));
+    }
+    entries = std::move(kept);
+}
+
+} // namespace
 
 void Settings::Clamp()
 {
@@ -43,6 +66,24 @@ void Settings::Clamp()
     c(iconSize, 16, 64, d.iconSize);
     c(magnify, 1, 2, d.magnify);
     c(notifyTimeout, 3, 30, d.notifyTimeout);
+    c(imeStateSettleMs, 0, 2000, d.imeStateSettleMs);
+    c(imeCaseSettleMs, 0, 2000, d.imeCaseSettleMs);
+    c(imeCompression, 0, 0.4, d.imeCompression);
+    c(imeRebound, 0.02, 0.6, d.imeRebound);
+    c(imeWobbleAmp, 0, 1.5, d.imeWobbleAmp);
+    c(imeWobbleHz, 1, 10, d.imeWobbleHz);
+    c(imeBubbleLifeMs, 400, 3000, d.imeBubbleLifeMs);
+    c(imeFirstBirthDip, 0, 120, d.imeFirstBirthDip);
+    c(imeLobeBirthDip, 0, 80, d.imeLobeBirthDip);
+    c(imeLobeRiseMs, 40, 2000, d.imeLobeRiseMs);
+    c(imeLobeAttachMs, 40, 2000, d.imeLobeAttachMs);
+    c(imeLobeSwallowMs, 40, 2000, d.imeLobeSwallowMs);
+    c(imeBubbleStartRadius, 16, 40, d.imeBubbleStartRadius);
+    c(imeBubbleEndRadius, 24, 52, d.imeBubbleEndRadius);
+    if (imeBubbleEndRadius < imeBubbleStartRadius)
+        imeBubbleEndRadius = imeBubbleStartRadius; // the curve only ever grows
+    NormalizeAppList(imeNoBubbleGames);
+    NormalizeAppList(imeNoBubblePinned);
     c(nearEnter, 2, 160, d.nearEnter);
     c(nearLeave, 2, 200, d.nearLeave);
     c(dockDisplayDelay, 100, 2000, d.dockDisplayDelay);
@@ -133,6 +174,34 @@ std::wstring Settings::ToJson() const
     o.SetNamedValue(L"taskbarRightPrimaryOnly", json::JsonValue::CreateBooleanValue(taskbarRightPrimaryOnly));
     o.SetNamedValue(L"windowsContextMenu", json::JsonValue::CreateBooleanValue(windowsContextMenu));
     num(L"notifyTimeout", notifyTimeout);
+    num(L"imeStateSettleMs", imeStateSettleMs);
+    num(L"imeCaseSettleMs", imeCaseSettleMs);
+    o.SetNamedValue(L"imeHideSwitchPopup", json::JsonValue::CreateBooleanValue(imeHideSwitchPopup));
+    num(L"imeCompression", imeCompression);
+    num(L"imeRebound", imeRebound);
+    num(L"imeWobbleAmp", imeWobbleAmp);
+    num(L"imeWobbleHz", imeWobbleHz);
+    num(L"imeBubbleLifeMs", imeBubbleLifeMs);
+    num(L"imeFirstBirthDip", imeFirstBirthDip);
+    num(L"imeLobeBirthDip", imeLobeBirthDip);
+    num(L"imeLobeRiseMs", imeLobeRiseMs);
+    num(L"imeLobeAttachMs", imeLobeAttachMs);
+    num(L"imeLobeSwallowMs", imeLobeSwallowMs);
+    num(L"imeBubbleStartRadius", imeBubbleStartRadius);
+    num(L"imeBubbleEndRadius", imeBubbleEndRadius);
+    o.SetNamedValue(L"imeBubbleGamePause", json::JsonValue::CreateBooleanValue(imeBubbleGamePause));
+    {
+        json::JsonArray a;
+        for (const std::wstring& game : imeNoBubbleGames)
+            a.Append(json::JsonValue::CreateStringValue(game));
+        o.SetNamedValue(L"imeNoBubbleGames", a);
+    }
+    {
+        json::JsonArray a;
+        for (const std::wstring& game : imeNoBubblePinned)
+            a.Append(json::JsonValue::CreateStringValue(game));
+        o.SetNamedValue(L"imeNoBubblePinned", a);
+    }
     num(L"nearEnter", nearEnter);
     num(L"nearLeave", nearLeave);
     o.SetNamedValue(L"notifyPlacement", json::JsonValue::CreateStringValue(notifyPlacement));
@@ -238,6 +307,33 @@ bool Settings::FromJson(const std::wstring& text, const Settings& base, Settings
     flag(L"autoWidth", s.autoWidth);
     flag(L"showRunning", s.showRunning);
     num(L"notifyTimeout", s.notifyTimeout);
+    num(L"imeStateSettleMs", s.imeStateSettleMs);
+    num(L"imeCaseSettleMs", s.imeCaseSettleMs);
+    flag(L"imeHideSwitchPopup", s.imeHideSwitchPopup);
+    num(L"imeCompression", s.imeCompression);
+    num(L"imeRebound", s.imeRebound);
+    num(L"imeWobbleAmp", s.imeWobbleAmp);
+    num(L"imeWobbleHz", s.imeWobbleHz);
+    num(L"imeBubbleLifeMs", s.imeBubbleLifeMs);
+    num(L"imeFirstBirthDip", s.imeFirstBirthDip);
+    num(L"imeLobeBirthDip", s.imeLobeBirthDip);
+    num(L"imeLobeRiseMs", s.imeLobeRiseMs);
+    num(L"imeLobeAttachMs", s.imeLobeAttachMs);
+    num(L"imeLobeSwallowMs", s.imeLobeSwallowMs);
+    num(L"imeBubbleStartRadius", s.imeBubbleStartRadius);
+    num(L"imeBubbleEndRadius", s.imeBubbleEndRadius);
+    flag(L"imeBubbleGamePause", s.imeBubbleGamePause);
+    auto strings = [&](const wchar_t* k, std::vector<std::wstring>& v) {
+        if (!o.HasKey(k) || o.GetNamedValue(k).ValueType() != json::JsonValueType::Array)
+            return;
+        std::vector<std::wstring> list;
+        for (const auto& e : o.GetNamedArray(k))
+            if (e.ValueType() == json::JsonValueType::String)
+                list.push_back(std::wstring(e.GetString()));
+        v = std::move(list);
+    };
+    strings(L"imeNoBubbleGames", s.imeNoBubbleGames);
+    strings(L"imeNoBubblePinned", s.imeNoBubblePinned);
     num(L"nearEnter", s.nearEnter);
     num(L"nearLeave", s.nearLeave);
     flag(L"notifyHideBody", s.notifyHideBody);

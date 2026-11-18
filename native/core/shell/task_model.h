@@ -51,6 +51,10 @@ bool LoadShellImage(const std::wstring& parsingName, int sizePx, IconImage& out,
 bool LoadAtriumIcon(const std::wstring& exePath, int sizePx, IconImage& out);
 // Resolves a shortcut and a versioned client's app/ launcher without starting it.
 std::wstring AppExecutable(const std::wstring& path);
+// The stable app key of a window in TaskItem::key's form (lowercase AUMID when
+// the app has one, else the lowercase program path; a hosted UWP app resolves
+// to its own AUMID). Empty when the window or its process cannot be read.
+std::wstring AppKeyOfWindow(HWND window);
 // An icon's picture, premultiplied BGRA (false for a monochrome icon).
 bool HIconToImage(HICON icon, IconImage& out);
 

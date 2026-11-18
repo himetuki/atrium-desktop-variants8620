@@ -138,6 +138,7 @@ public sealed partial class MainWindow
         if (_excluded.SelectMany(vm => vm.Entries).SequenceEqual(entries, StringComparer.OrdinalIgnoreCase))
         {
             RefreshExcluded();
+            RebuildNoBubble();
             return;
         }
         _excluded.Clear();
@@ -157,6 +158,7 @@ public sealed partial class MainWindow
         }
         foreach (var vm in _excluded) _ = LoadRowIconAsync(vm);
         RefreshExcluded();
+        RebuildNoBubble();
     }
 
     private void RefreshExcluded()
@@ -172,6 +174,7 @@ public sealed partial class MainWindow
     {
         _current.StageExcluded = _excluded.SelectMany(vm => vm.Entries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         RefreshExcluded();
+        RebuildNoBubble();
     }
 
     internal void RemoveExcluded(ExcludedVm vm)

@@ -12,6 +12,7 @@
 #include "../status.h"
 #include "glass_panel.h"
 #include "hover_wave.h"
+#include "ime_swap.h"
 
 #include <d2d1_3.h>
 #include <dwrite_3.h>
@@ -53,6 +54,17 @@ struct BarScene {
     std::vector<SceneItem> extras; // Atrium logo (#start), overflow (#more), tray (#tray), status (#status), notifications (#notify)
     SystemStatus status;           // drawn by the #status entry
     bool statusIcons = false;      // as the Windows taskbar's three icons rather than the ring (statusStyle)
+    // The input method announcement (issue #56): its glyph (中/a/A; empty:
+    // none) and when it started (ClockMs; 0: never). The #status entry swaps
+    // its connection symbol for it and back (render/ime_swap.h).
+    std::wstring imeGlyph;
+    double imeMs = 0;
+    // A continued announcement (a switch while the previous glyph still shows):
+    // the outgoing glyph and the opacity it had then, so the new one crossfades
+    // from it with the connection symbol kept away (render/ime_swap.h).
+    std::wstring imePrevGlyph;
+    float imePrevAlpha = 0;
+    bool imeContinued = false;
     float separatorX = -1;     // < 0: none
     D2D1_RECT_F clock{};       // empty: no clock
     float timePx = 0, datePx = 0;
@@ -124,10 +136,14 @@ private:
     // battery's level (the volume without a battery) round the Wi-Fi fan (or
     // wired / offline); while the volume or the brightness changes the ring
     // shows it and a speaker or a sun takes the fan's place (StatusMotion).
-    void DrawStatus(ID2D1DeviceContext2* d2d, const SystemStatus& st, D2D1_RECT_F r, ID2D1SolidColorBrush* brush, D2D1_COLOR_F ink, bool darkInk);
+    // `ime`: the language glyph to show in the fan's place now (may be empty);
+    // `imePrev`: the outgoing glyph of a continued swap, crossfading out.
+    void DrawStatus(ID2D1DeviceContext2* d2d, const SystemStatus& st, const std::wstring& ime, const std::wstring& imePrev, D2D1_RECT_F r,
+                    ID2D1SolidColorBrush* brush, D2D1_COLOR_F ink, bool darkInk);
     // The same as the Windows taskbar shows it: the network, the speaker and the battery side by
     // side in `r` (its height the icons'), redrawn in the bar's ink.
-    void DrawStatusIcons(ID2D1DeviceContext2* d2d, const SystemStatus& st, D2D1_RECT_F r, ID2D1SolidColorBrush* brush, D2D1_COLOR_F ink, bool darkInk);
+    void DrawStatusIcons(ID2D1DeviceContext2* d2d, const SystemStatus& st, const std::wstring& ime, const std::wstring& imePrev, D2D1_RECT_F r,
+                         ID2D1SolidColorBrush* brush, D2D1_COLOR_F ink, bool darkInk);
     float MapX(float u) const; // base x -> displayed x under the magnification
 
     struct Motion {
@@ -186,6 +202,8 @@ private:
     float slide_ = 0, slideFrom_ = 0;
     bool slideDown_ = false;
     double slideStartMs_ = 0;
+    // The input method announcement's fade, from ImeSwapAt (bar_painter.cpp).
+    float imeOut_ = 0, imeIn_ = 0, imePrev_ = 0;
     BarFrame frame_;
     winrt::com_ptr<ID2D1Bitmap1> layer_;
     std::wstring layerKey_;

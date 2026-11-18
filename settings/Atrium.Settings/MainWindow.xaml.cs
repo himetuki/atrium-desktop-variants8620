@@ -67,6 +67,48 @@ public sealed partial class MainWindow : Window
 
         new("notify", Loc.T("Popup duration"), 3, 30, 1, "s",
             s => s.NotifyTimeout, (s, v) => s.NotifyTimeout = v, false),
+
+        // The input method announcements (issue #56): the bar's status icon or
+        // the bubble shows a change once it has dwelt this long.
+        new("ime", Loc.T("State change dwell"), 0, 1000, 10, "ms",
+            s => s.ImeStateSettleMs, (s, v) => s.ImeStateSettleMs = v, false),
+        new("ime", Loc.T("Case change dwell"), 0, 1000, 10, "ms",
+            s => s.ImeCaseSettleMs, (s, v) => s.ImeCaseSettleMs = v, false),
+        // The bubble's own feel: the merge's compression, rebound and liquid
+        // wobble, and how long it lives. Shown as whole numbers, as the tile
+        // does; the stored values are the fractions (and Hz) the core takes.
+        new("ime", Loc.T("Impact compression"), 0, 40, 1, "%",
+            s => s.ImeCompression * 100, (s, v) => s.ImeCompression = v / 100, false),
+        new("ime", Loc.T("Rebound overshoot"), 2, 60, 1, "%",
+            s => s.ImeRebound * 100, (s, v) => s.ImeRebound = v / 100, false),
+        new("ime", Loc.T("Wobble amplitude"), 0, 150, 1, "%",
+            s => s.ImeWobbleAmp * 100, (s, v) => s.ImeWobbleAmp = v / 100, false),
+        // The tile shows whole numbers only, so the rhythm rides in tenths of a
+        // hertz: 43 reads as 4.3 Hz, and the 1..10 Hz range is 10..100.
+        new("ime", Loc.T("Wobble speed"), 10, 100, 1, "×0.1 Hz",
+            s => s.ImeWobbleHz * 10, (s, v) => s.ImeWobbleHz = v / 10, false),
+        new("ime", Loc.T("Bubble lifetime"), 400, 3000, 20, "ms",
+            s => s.ImeBubbleLifeMs, (s, v) => s.ImeBubbleLifeMs = v, false),
+        // The bubble's size: the radius of the first bubble and the one ten
+        // merges reach; the merges between follow a logarithmic curve, and the
+        // glyph rides the bubble's scale.
+        new("ime", Loc.T("Initial bubble size"), 16, 40, 1, "px",
+            s => s.ImeBubbleStartRadius, (s, v) => s.ImeBubbleStartRadius = v, false),
+        new("ime", Loc.T("Final bubble size"), 24, 52, 1, "px",
+            s => s.ImeBubbleEndRadius, (s, v) => s.ImeBubbleEndRadius = v, false),
+        // Where the bubbles are born and how a newcomer's absorb divides: the
+        // first bubble below its resting centre, a newcomer below the window's
+        // bottom edge, then its slow rise, fast attach and swallow.
+        new("ime", Loc.T("First bubble birth"), 0, 120, 1, "px",
+            s => s.ImeFirstBirthDip, (s, v) => s.ImeFirstBirthDip = v, false),
+        new("ime", Loc.T("Newcomer birth"), 0, 80, 1, "px",
+            s => s.ImeLobeBirthDip, (s, v) => s.ImeLobeBirthDip = v, false),
+        new("ime", Loc.T("Newcomer rise"), 40, 2000, 10, "ms",
+            s => s.ImeLobeRiseMs, (s, v) => s.ImeLobeRiseMs = v, false),
+        new("ime", Loc.T("Newcomer attach"), 40, 2000, 10, "ms",
+            s => s.ImeLobeAttachMs, (s, v) => s.ImeLobeAttachMs = v, false),
+        new("ime", Loc.T("Newcomer swallow"), 40, 2000, 10, "ms",
+            s => s.ImeLobeSwallowMs, (s, v) => s.ImeLobeSwallowMs = v, false),
     };
 
     private static string[] PageTitles => new[]
@@ -167,6 +209,7 @@ public sealed partial class MainWindow : Window
         BuildTintSwatches();
         InitPins();
         InitSources();
+        InitNoBubble();
         InitHero();
         PhotoChanged += () =>
         {
@@ -351,6 +394,7 @@ public sealed partial class MainWindow : Window
             ["clarity"] = (ClarityTiles, true, false), ["edge"] = (EdgeRows, false, true), ["light"] = (LightRows, false, true),
             ["size"] = (SizeRows, false, true), ["width"] = (WidthRows, false, true), ["dock"] = (DockRows, false, true), ["notify"] = (NotifyRows, true, true),
             ["near"] = (NearRows, false, true),
+            ["ime"] = (ImeRows, true, true),
         };
         var placed = new Dictionary<string, int>();
         foreach (var d in Sliders)
@@ -809,6 +853,8 @@ public sealed partial class MainWindow : Window
         ClockSwitch.IsOn = _current.ShowClock;
         ClockSecondsSwitch.IsOn = _current.ShowClockSeconds;
         UpdateClockOptions();
+        ImeBubbleGamePauseSwitch.IsOn = _current.ImeBubbleGamePause;
+        ImeHideSwitchPopupSwitch.IsOn = _current.ImeHideSwitchPopup;
         TraySwitch.IsOn = _current.ShowTray;
         TrayHostSwitch.IsOn = _current.TrayHost;
         StartTraySwitch.IsOn = _current.StartTray;
@@ -933,6 +979,13 @@ public sealed partial class MainWindow : Window
     {
         if (_loading) return;
         _current.ShowClockSeconds = ClockSecondsSwitch.IsOn;
+        Changed();
+    }
+
+    private void OnImeHideSwitchPopupToggled(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _current.ImeHideSwitchPopup = ImeHideSwitchPopupSwitch.IsOn;
         Changed();
     }
 

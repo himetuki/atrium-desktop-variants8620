@@ -40,6 +40,12 @@ target_compile_definitions(stage_excluded_tests PRIVATE NOMINMAX WIN32_LEAN_AND_
 target_link_libraries(stage_excluded_tests PRIVATE user32)
 add_test(NAME stage_excluded COMMAND stage_excluded_tests)
 
+add_executable(ime_bubble_tests ime_bubble.cpp)
+target_include_directories(ime_bubble_tests PRIVATE ../core)
+target_compile_definitions(ime_bubble_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(ime_bubble_tests PRIVATE windowsapp user32 imm32)
+add_test(NAME ime_bubble COMMAND ime_bubble_tests)
+
 add_executable(double_click_tests
     double_click.cpp)
 target_include_directories(double_click_tests PRIVATE ../core)

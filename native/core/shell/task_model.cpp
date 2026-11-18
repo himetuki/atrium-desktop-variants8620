@@ -741,6 +741,21 @@ bool HIconToImage(HICON icon, IconImage& out)
     return IconToImage(icon, out);
 }
 
+// The stable app key the task model groups by: the lowercase AUMID when the app
+// has one (a hosted UWP app's own, not ApplicationFrameHost's), else the
+// lowercase program path. Empty when the window or its process cannot be read.
+std::wstring AppKeyOfWindow(HWND window)
+{
+    DWORD pid = 0;
+    if (window)
+        GetWindowThreadProcessId(window, &pid);
+    if (!pid)
+        return {};
+    wchar_t cls[256] = {};
+    GetClassNameW(window, cls, ARRAYSIZE(cls));
+    return ComputeInfo(window, pid, cls).key;
+}
+
 struct TaskModel::Impl {
     HWND ui;
     std::function<void()> onChanged;

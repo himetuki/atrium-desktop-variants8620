@@ -806,6 +806,52 @@
                                     </local:SegmentTrack>
                                 </StackPanel>
                             </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="Input method" Style="{StaticResource SectionStyle}" />
+                                <TextBlock Style="{StaticResource RowNoteStyle}" TextWrapping="Wrap"
+                                           Text="A language, input method or case change shows in the status icon, or as a bubble above the bar while it is hidden — once it has dwelt this long." />
+                                <StackPanel x:Name="ImeRows" />
+                                <local:ToggleTile x:Name="ImeBubbleGamePauseSwitch" Title="No bubble over fullscreen games"
+                                                  Note="While a fullscreen game from the no-bubble list is in front, switching the language or input method stays quiet."
+                                                  SwitchName="No bubble over fullscreen games" Toggled="OnImeBubbleGamePauseToggled" Flat="True" />
+                                <local:ToggleTile x:Name="ImeHideSwitchPopupSwitch" Title="Hide the system input-switch popup"
+                                                  Note="Win+Space keeps switching input methods, but Windows' visual picker no longer appears (Windows 11)."
+                                                  SwitchName="Hide the system input-switch popup" Toggled="OnImeHideSwitchPopupToggled" Flat="True" />
+                                <!-- The games whose full-screen front keeps the bubble quiet (imeNoBubbleGames) -->
+                                <StackPanel x:Name="NoBubbleSection" Margin="0,14,0,0" Spacing="6">
+                                    <TextBlock Text="No-bubble games" Style="{StaticResource RowTitleStyle}" />
+                                    <TextBlock Style="{StaticResource RowNoteStyle}"
+                                               Text="Starts as a copy of the games Stage Manager leaves alone and grows with new ones; a game removed here is not synced again." />
+                                    <Border Style="{StaticResource GroupStyle}" Margin="0,6,0,0">
+                                        <Grid>
+                                            <ListView x:Name="NoBubbleList" SelectionMode="None" ItemContainerStyle="{StaticResource PinItemStyle}"
+                                                      AutomationProperties.Name="No-bubble games" Padding="0,4,0,4" IsEnabled="False">
+                                                <ListView.ItemsPanel>
+                                                    <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
+                                                </ListView.ItemsPanel>
+                                                <ListView.ItemTemplate>
+                                                    <DataTemplate x:DataType="local:NoBubbleVm">
+                                                        <Grid Padding="14,6,10,6" ColumnSpacing="10" MinHeight="48" Background="Transparent" Loaded="OnLocalizeTemplate">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="{x:Bind Entry}" Style="{StaticResource RowTitleStyle}"
+                                                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                                            <Button Grid.Column="1" Style="{StaticResource IconButtonStyle}" Click="{x:Bind Remove}" VerticalAlignment="Center"
+                                                                    AutomationProperties.Name="{x:Bind RemoveName}" ToolTipService.ToolTip="Remove">
+                                                                <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                                            </Button>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ListView.ItemTemplate>
+                                            </ListView>
+                                            <TextBlock x:Name="NoBubbleEmpty" Text="No games excluded" Style="{StaticResource RowNoteStyle}"
+                                                       HorizontalAlignment="Center" Margin="0,14,0,14" Visibility="Collapsed" />
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
 
                         <!-- The time -->

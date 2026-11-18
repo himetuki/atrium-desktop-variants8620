@@ -204,6 +204,11 @@ public:
     // No glass at all: the content alone, transparent where nothing is drawn (Stage Manager's
     // strip, a widget with its own opaque face). May change while shown: the glass layer goes or comes.
     void SetGlassless(bool on);
+    // The content normally waits for the glass of its frame to be presented
+    // (one composition, perfectly paired). A transient animation that owns its
+    // window can stream instead: no wait, so a stalled glass frame of the
+    // render thread can never freeze the contents.
+    void SetGlassLockstep(bool on) { glassLockstep_ = on; }
     // Separate pieces of glass (content DIP), back to front; empty: the whole
     // content with the radius. Published to the glass when they change.
     void SetShapes(const std::vector<ShapeDip>& shapes, bool animating = false);
@@ -235,6 +240,7 @@ private:
     bool activatable_;
     bool desktopLayer_ = false;
     bool glassless_ = false;
+    bool glassLockstep_ = true; // the content waits for its glass (SetGlassLockstep)
     float insetDip_;
     bool visible_ = false;
     bool hiding_ = false;    // closing animation running

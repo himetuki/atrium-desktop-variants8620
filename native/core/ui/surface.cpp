@@ -1361,7 +1361,7 @@ void Surface::Paint()
     paintMs_ = ms;
     presentGen_ = glassGen_;
     presentPending_ = true;
-    bool waitForGlass = glassPending_ && glassReady_ && !IsGlassPresented(hwnd_, presentGen_);
+    bool waitForGlass = glassLockstep_ && glassPending_ && glassReady_ && !IsGlassPresented(hwnd_, presentGen_);
     glassPending_ = false;
     if (!waitForGlass)
         Present();

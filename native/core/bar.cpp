@@ -1721,6 +1721,24 @@ void Bar::SetStatus(const SystemStatus& status)
     UpdateTooltips();
 }
 
+void Bar::AnnounceIme(const std::wstring& glyph)
+{
+    if (glyph.empty())
+        return;
+    // A switch while the previous glyph is still on screen crossfades from it
+    // instead of restarting the handshake, whose first step would flash the
+    // connection symbol back between the two glyphs.
+    const double now = ClockMs();
+    const double elapsed = now - scene_.imeMs;
+    const bool continued = !scene_.imeGlyph.empty() && scene_.imeMs > 0 && ImeSwapShowing(elapsed);
+    scene_.imeContinued = continued;
+    scene_.imePrevGlyph = continued ? scene_.imeGlyph : std::wstring();
+    scene_.imePrevAlpha = continued ? ImeSwapAt(elapsed).in : 0.f;
+    scene_.imeGlyph = glyph;
+    scene_.imeMs = now;
+    Publish(); // content only: the glass does not change
+}
+
 void Bar::SetUnread(int count)
 {
     if (count == unread_)
